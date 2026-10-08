@@ -502,6 +502,15 @@ button.big { padding: 8px 12px; font-size: 14px; }
 /* ---- connections & model picker ------------------------------------------- */
 .connections { display: flex; flex-direction: column; gap: 12px; margin: 10px 0; }
 .connection { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.local-card { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); margin: 10px 0; }
+.local-rec { background: var(--panel-2); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.local-progress { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.local-progress .progressbar { align-self: stretch; margin: 4px 0; }
+.progressbar > div.indeterminate { width: 30% !important; animation: progress-slide 1.4s ease-in-out infinite; }
+@keyframes progress-slide { 0%, 100% { margin-left: 0; } 50% { margin-left: 70%; } }
+.local-result { border-left: 3px solid var(--ok); padding-left: 10px; display: flex; flex-direction: column; gap: 6px; }
+.local-result.verdict-ok { border-left-color: var(--warn); }
+.local-result.verdict-slow { border-left-color: var(--bad); }
 .conn-fields input[type='password'] { min-width: 300px; }
 .model-list { display: flex; flex-direction: column; gap: 6px; }
 .model-row { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; background: var(--panel-2); display: flex; flex-direction: column; gap: 6px; }

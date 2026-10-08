@@ -4,6 +4,7 @@ import { ATTRIBUTES, type BenchCheck, type BenchmarkReport } from '@shared/bench
 import { api, useApp } from '@/state/app'
 import { useBench } from '@/state/bench'
 import { CompareModels } from './CompareModels'
+import { LocalTutorCard } from './LocalTutorCard'
 
 const pct = (x: number) => `${Math.round(x * 100)}%`
 const uidOf = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
@@ -38,6 +39,8 @@ export function ModelsView() {
         Connect a provider once with its API key, then choose any of its models. One Anthropic key covers every Claude model, one Google key every Gemini
         model. Keys are encrypted with your OS keychain and only sent to that provider.
       </p>
+
+      <LocalTutorCard />
 
       <div className="connections">
         {settings.connections.length === 0 && <div className="muted">No connections yet. Add one below.</div>}

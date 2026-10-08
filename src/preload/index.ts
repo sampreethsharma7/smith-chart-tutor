@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import type { DesktopApi } from '@shared/ipc'
 import type { StreamEvent } from '@shared/llm'
+import type { SetupProgress } from '@shared/localModels'
 
 let seq = 0
 
@@ -45,6 +46,19 @@ const api: DesktopApi = {
   files: {
     openData: () => ipcRenderer.invoke('files:openData'),
     openDataFolder: () => ipcRenderer.invoke('files:openDataFolder')
+  },
+  local: {
+    probe: () => ipcRenderer.invoke('local:probe'),
+    setup(model, onProgress) {
+      const id = `ls${Date.now().toString(36)}_${seq++}`
+      const listener = (_e: IpcRendererEvent, sid: string, p: SetupProgress) => {
+        if (sid === id) onProgress(p)
+      }
+      ipcRenderer.on('local:progress', listener)
+      const done = ipcRenderer.invoke('local:setup', id, model).finally(() => ipcRenderer.removeListener('local:progress', listener))
+      return { id, done }
+    },
+    cancel: (id) => ipcRenderer.invoke('local:cancel', id)
   }
 }
 

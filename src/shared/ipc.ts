@@ -1,5 +1,6 @@
 import type { ChatRequest, Connection, ProviderConfig, StreamEvent } from './llm'
 import type { BenchmarkReport } from './benchmark'
+import type { MachineInfo, OllamaStatus, SetupProgress, SetupResult } from './localModels'
 
 export interface AppSettings {
   /** Provider accounts/endpoints; each holds one API key */
@@ -55,5 +56,12 @@ export interface DesktopApi {
   files: {
     openData(): Promise<OpenedFile[]>
     openDataFolder(): Promise<void>
+  }
+  /** A free local tutor with Ollama: what this machine has, and a one-click setup */
+  local: {
+    probe(): Promise<{ machine: MachineInfo; status: OllamaStatus }>
+    /** Installs Ollama if needed, starts it, downloads the model and measures it; progress streams to onProgress */
+    setup(model: string, onProgress: (p: SetupProgress) => void): { id: string; done: Promise<SetupResult> }
+    cancel(id: string): Promise<void>
   }
 }

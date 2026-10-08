@@ -53,6 +53,30 @@ Keys belong to **connections** (one per provider account), not to models: one An
 
 Three adapters cover most providers: Anthropic, OpenAI-compatible (OpenAI, Ollama, LM Studio, OpenRouter, Groq, vLLM…) and Gemini. LLM calls run in the main process, so keys never reach the page. Reasoning models' `<think>` blocks are hidden from the chat.
 
+### Free local tutor (Ollama)
+
+The card at the top of the Models tab sets up a local tutor in one click, with no admin rights. The code is in [localModels.ts](../src/shared/localModels.ts) and [ollama.ts](../src/main/ollama.ts).
+
+1. **It checks this computer.**
+   - It reads the memory, and the GPU's memory: NVIDIA through the driver's `nvidia-smi`, while Apple Silicon shares the RAM and about two thirds of it is usable.
+   - It looks for an Ollama that's already running or installed, including the app's own copy.
+2. **It recommends a model.** The candidates are the local models that did best on the tutor benchmark, using the scores shipped with the app:
+   - **qwen3:8b** when about 7 GB of GPU memory is free
+   - **qwen3:1.7b** when there's about 3 GB, or when it has to run on the processor
+   - none, with an honest pointer to cloud models, for machines with under 8 GB of memory and no usable GPU
+
+   The reason is shown in plain words, and a smaller model is always one click away.
+3. **It sets it up.**
+   - **Ollama:** if there's no Ollama, it downloads the official standalone build for this OS into the per-user local app-data folder (on Windows `%LOCALAPPDATA%\SmithChartTutor\ollama`, not the roaming profile). The download is checked against Ollama's published checksum.
+   - **Running it:** the app starts it while it runs and stops it when the app closes. It never stops an Ollama you run yourself.
+   - **The model:** it downloads the model with a progress bar. Downloads go through Electron's network stack, so the system proxy and company certificates apply.
+4. **It measures this machine.**
+   - It loads the model once, which is timed separately because it happens once per session.
+   - It asks two short tutor questions and averages how long the answer takes to start (thinking included, because the learner waits for it) and how fast it streams.
+   - It reads how much of the model sits on the GPU.
+   - The verdict is *comfortable*, *usable, with some waiting*, or *slow*. Slow offers the smaller model or a cloud model.
+5. **It adds the model** under an Ollama connection, with **Use as tutor**.
+
 **Run benchmark** (or **Benchmark all** on a connection) runs 18 checks, all graded by code (no LLM judge). Each attribute matches a job the model does in the tool:
 
 | Attribute | Used for | Example checks |

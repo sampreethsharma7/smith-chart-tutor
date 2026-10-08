@@ -6,6 +6,8 @@ import { runBenchmark, type ChatFn } from '@shared/benchmark'
 import type { AppSettings } from '@shared/ipc'
 import { abortChat, listModels, runChat } from './llm'
 import * as store from './storage'
+import * as ollama from './ollama'
+import type { SetupProgress, SetupResult } from '@shared/localModels'
 
 let win: BrowserWindow | null = null
 
@@ -125,6 +127,44 @@ function registerIpc() {
     return Promise.all(r.filePaths.map(async (p) => ({ name: basename(p), text: await fs.readFile(p, 'utf8') })))
   })
   ipcMain.handle('files:openDataFolder', () => shell.openPath(store.dataFolder()))
+
+  // A free local tutor: find or install Ollama (no admin rights), start it, fetch the model, measure it.
+  const setups = new Map<string, AbortController>()
+  ipcMain.handle('local:probe', async () => ({ machine: await ollama.probeMachine(), status: await ollama.ollamaStatus() }))
+  ipcMain.handle('local:setup', async (e, id: string, model: string): Promise<SetupResult> => {
+    const ac = new AbortController()
+    setups.set(id, ac)
+    const progress = (p: SetupProgress) => { if (!e.sender.isDestroyed()) e.sender.send('local:progress', id, p) }
+    try {
+      let st = await ollama.ollamaStatus()
+      if (!st.running) {
+        const bin = st.binary ?? (await ollama.installOllama(progress, ac.signal))
+        progress({ step: 'start', text: 'Starting Ollama…' })
+        await ollama.startOllama(bin)
+        st = await ollama.ollamaStatus()
+      }
+      if (!st.models.includes(model)) {
+        progress({ step: 'model', text: `Downloading ${model}…` })
+        await ollama.pullModel(model, progress, ac.signal)
+      }
+      progress({ step: 'speed', text: `Checking how ${model} runs on this computer…` })
+      return { ok: true, speed: await ollama.speedTest(model, ac.signal), apiBase: st.apiBase }
+    } catch (err) {
+      return { ok: false, error: ac.signal.aborted ? 'Cancelled.' : (err as Error).message }
+    } finally {
+      setups.delete(id)
+    }
+  })
+  ipcMain.handle('local:cancel', (_e, id: string) => setups.get(id)?.abort())
+}
+
+/** With an Ollama connection set up, make sure Ollama is running (it isn't a background service when the app installed it). */
+async function autoStartOllama() {
+  const s = await store.getSettings()
+  if (!s.connections.some((c) => c.preset === 'ollama')) return
+  const st = await ollama.ollamaStatus()
+  if (st.running || !st.binary) return
+  await ollama.startOllama(st.binary).catch((e) => console.log('[ollama]', (e as Error).message))
 }
 
 // Dev aids (scripted runs, benchmarks, a throwaway data folder) are for development only.
@@ -224,10 +264,14 @@ app.whenReady().then(async () => {
   }
   registerIpc()
   createWindow()
+  autoStartOllama().catch(() => {})
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+// The Ollama this app started stops with it (one the user runs themselves is left alone).
+app.on('will-quit', () => ollama.stopOllama())
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

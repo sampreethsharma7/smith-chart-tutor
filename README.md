@@ -103,7 +103,14 @@ Each of these maps to one of 11 underlying confusions. When the same confusion t
 </p>
 
 ### 🤖 Bring any model, and compare them honestly
-Add a connection once (Anthropic, Google Gemini, OpenAI, OpenRouter, Ollama, LM Studio, or any OpenAI-compatible endpoint), then pick from its models. Keys are encrypted with your OS keychain, stay in the main process, and only go to that provider.
+**Free local tutor in one click:**
+
+1. The app reads your GPU and memory.
+2. It recommends the best local model your machine can run, judged by the benchmark below.
+3. It installs Ollama for you, with no admin rights, and downloads the model.
+4. It measures the real speed on your computer, for example "Answers start after about 6 s and come at about 39 words a second (fully on your GPU)", before you rely on it.
+
+Or add a connection (Anthropic, Google Gemini, OpenAI, OpenRouter, Ollama, LM Studio, or any OpenAI-compatible endpoint), then pick from its models. Keys are encrypted with your OS keychain, stay in the main process, and only go to that provider.
 
 The built-in benchmark runs **18 checks, all graded by code**, one group for each job the model does in the app: guiding, tool use, RF knowledge, RF maths, learner tracking, summaries and speed. Reference results ship with the app, so you can compare cloud and local models before you choose.
 
@@ -167,7 +174,10 @@ The memory lives in the app, not the model, so it's the same whichever model tea
 
 That's all. The first run takes a few minutes. It downloads a private copy of Node.js (checked against its official checksum), installs the app's components and builds the app, all **inside that folder**. After that, a double-click starts the app in seconds.
 
-You'll also need an API key for at least one AI provider, or a free local model in [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai). The app asks for it in the Models tab and links to where to get one.
+Then pick a tutor model in the **Models** tab. You have two options:
+
+- **A free local tutor, in one click.** The app checks your computer (its GPU and memory) and recommends the local model that scored best on its tutor benchmark and fits your machine. It then sets up [Ollama](https://ollama.com) without admin rights, downloads the model, and measures how fast it really runs on your computer before you rely on it. No key, no cost, and it works offline.
+- **A cloud model,** such as Claude, Gemini or GPT. Paste an API key, and the app links to where to get one. These are faster and stronger, and paid.
 
 <details>
 <summary><b>First time on macOS or Windows: the "can't be opened" / "protected your PC" warning</b></summary>
@@ -265,7 +275,7 @@ src/
 - Everything stays on your machine, as plain JSON in your user-data folder.
 - API keys are encrypted with the OS keychain and never shown to the page.
 - Profile exports never include keys.
-- The only network traffic is to the model provider you choose.
+- The only network traffic goes to the model provider you choose. If you ask for the free local tutor, the app also downloads Ollama from GitHub and the model from Ollama's library; after that, the tutor runs entirely on your computer.
 
 ## License
 
