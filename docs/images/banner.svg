@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-label="Smith Chart Tutor: an interactive Smith chart with an AI tutor">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#131c2e"/>
+    </linearGradient>
+    <linearGradient id="path" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f472b6"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4f8cff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#4f8cff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="disc"><circle cx="1000" cy="200" r="160"/></clipPath>
+  </defs>
+  <rect width="1280" height="400" fill="url(#bg)"/>
+  <circle cx="1000" cy="200" r="230" fill="url(#glow)"/>
+
+  <!-- Smith chart (unit circle radius 160 at 1000,200): constant-r circles and constant-x arcs -->
+  <g fill="none" stroke="#5b6b86" stroke-width="1.2" opacity="0.75">
+    <circle cx="1000" cy="200" r="160" stroke="#8fa3c4" stroke-width="2"/>
+    <line x1="840" y1="200" x2="1160" y2="200"/>
+    <!-- r = 0.2, 0.5, 1, 2, 5: centre r/(1+r), radius 1/(1+r) -->
+    <circle cx="1026.7" cy="200" r="133.3"/>
+    <circle cx="1053.3" cy="200" r="106.7"/>
+    <circle cx="1080" cy="200" r="80"/>
+    <circle cx="1106.7" cy="200" r="53.3"/>
+    <circle cx="1133.3" cy="200" r="26.7"/>
+    <!-- x = ±0.5, ±1, ±2: centre (1, ±1/x), radius 1/|x| -->
+    <g clip-path="url(#disc)">
+      <circle cx="1160" cy="-120" r="320"/>
+      <circle cx="1160" cy="520" r="320"/>
+      <circle cx="1160" cy="40" r="160"/>
+      <circle cx="1160" cy="360" r="160"/>
+      <circle cx="1160" cy="120" r="80"/>
+      <circle cx="1160" cy="280" r="80"/>
+    </g>
+  </g>
+  <!-- g = 1 circle (admittance), dashed -->
+  <circle cx="920" cy="200" r="80" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="7 6" opacity="0.9"/>
+  <!-- An L-match: load 0.5 − j0.6 → series L along r = 0.5 to 0.5 + j0.5 → shunt C along g = 1 to the centre -->
+  <path d="M 976.1 273.6 A 106.7 106.7 0 0 1 968 136" fill="none" stroke="#f472b6" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 968 136 A 80 80 0 0 1 1000 200" fill="none" stroke="url(#path)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="976.1" cy="273.6" r="8" fill="#f59e0b" stroke="#0b1220" stroke-width="2"/>
+  <circle cx="1000" cy="200" r="8" fill="#34d399" stroke="#0b1220" stroke-width="2"/>
+
+  <!-- Title and tags -->
+  <g font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+    <text x="80" y="150" fill="#e6edf7" font-size="62" font-weight="700">Smith Chart Tutor</text>
+    <text x="82" y="200" fill="#9fb0c8" font-size="25">An interactive Smith chart with an AI tutor</text>
+    <text x="82" y="234" fill="#9fb0c8" font-size="25">that teaches like a person and grades like an engineer.</text>
+    <g font-size="17" font-weight="600" text-anchor="middle">
+      <rect x="82" y="276" width="206" height="36" rx="18" fill="#1e2a40" stroke="#33415c"/>
+      <text x="185" y="300" fill="#8fb4ff">Impedance matching</text>
+      <rect x="300" y="276" width="156" height="36" rx="18" fill="#1e2a40" stroke="#33415c"/>
+      <text x="378" y="300" fill="#c4b5fd">Agentic tutor</text>
+      <rect x="468" y="276" width="158" height="36" rx="18" fill="#1e2a40" stroke="#33415c"/>
+      <text x="547" y="300" fill="#6ee7b7">Exact grading</text>
+      <rect x="638" y="276" width="124" height="36" rx="18" fill="#1e2a40" stroke="#33415c"/>
+      <text x="700" y="300" fill="#fbbf24">Any LLM</text>
+    </g>
+  </g>
+</svg>

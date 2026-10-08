@@ -1,0 +1,1822 @@
+[
+ {
+  "providerId": "ref_anthropic_claude_opus_5_5",
+  "providerLabel": "Claude Opus 5.5",
+  "model": "claude-opus-5-5",
+  "kind": "anthropic",
+  "id": "run_mux52yei",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:36:39.978Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 882.0832999999984,
+    "score": 1,
+    "detail": "Answered in 882 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 6591.726200000005,
+    "score": 0.8422147571428567,
+    "detail": "180.6 tokens/s, first visible token 3209 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 1500.0093000000052
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 3070.547500000015,
+    "score": 1,
+    "detail": "\"A 100 + j0 Ω load on a 50 Ω system has a **VSWR of 2.0:1**.\n\nHere's what the calculation tool gave:\n- **Reflection coeff…\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 1,
+    "detail": "read the chart, computed with the tool, correct VSWR 2.62"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 1,
+    "detail": "used the prediction card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 3986.868699999992,
+    "score": 1,
+    "detail": "12/12 correct"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 2660.860799999995,
+    "score": 1,
+    "detail": "6/6 correct"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 1,
+    "detail": "did not just agree; asked a question; pointed to clockwise"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "39 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0.8,
+    "detail": "record_evidence({\"skill\":\"lumped_moves\",\"outcome\":\"partial\",\"difficulty\":1}), log_misconception({\"skill\":\"lumped_moves\",\"description\":\"Thinks a series capacitor moves the point)"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 1,
+    "detail": "92 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 3208.9934000000067,
+   "tokensPerSec": 180.6226699010443,
+   "avgLatencyMs": 3762.3930699999996,
+   "totalTokens": 10416
+  },
+  "scores": {
+   "overall": 0.9781661067857143,
+   "guiding": 1,
+   "tools": 1,
+   "rf_knowledge": 1,
+   "rf_math": 1,
+   "learner": 0.9,
+   "summary": 1,
+   "speed": 0.9211073785714283
+  },
+  "tier": "Excellent",
+  "advice": [
+   "Well suited as your Smith-chart tutor."
+  ]
+ },
+ {
+  "providerId": "ref_anthropic_claude_sonnet_5_5",
+  "providerLabel": "Claude Sonnet 5.5",
+  "model": "claude-sonnet-5-5",
+  "kind": "anthropic",
+  "id": "run_mux51cc4",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:35:24.724Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 1250.472299999994,
+    "score": 1,
+    "detail": "Answered in 1250 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 4460.462799999994,
+    "score": 0.9642258857142858,
+    "detail": "135.8 tokens/s, first visible token 1501 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 1309.4052999999985
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 2891.2109000000055,
+    "score": 1,
+    "detail": "\"A 100 + j0 Ω load on a 50 Ω system has a **VSWR of 2.0** (2:1).\n\n- **Reflection coefficient |Γ|:** 0.333\n- **Return loss…\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 1,
+    "detail": "read the chart, computed with the tool, correct VSWR 2.62"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 1,
+    "detail": "used the prediction card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 4046.6665000000066,
+    "score": 1,
+    "detail": "12/12 correct"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 3710.5258999999933,
+    "score": 1,
+    "detail": "6/6 correct"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.7,
+    "detail": "did not just agree; asked a question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "92 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 1,
+    "detail": "record_evidence({\"skill\":\"lumped_moves\",\"outcome\":\"incorrect\",\"difficulty\":1}), log_misconception({\"skill\":\"lumped_moves\",\"description\":\"Said a series capacitor moves the point c)"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 0.9,
+    "detail": "112 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 1500.837599999999,
+   "tokensPerSec": 135.82793614384093,
+   "avgLatencyMs": 3022.4868849999975,
+   "totalTokens": 10804
+  },
+  "scores": {
+   "overall": 0.9673169414285715,
+   "guiding": 0.9,
+   "tools": 1,
+   "rf_knowledge": 1,
+   "rf_math": 1,
+   "learner": 1,
+   "summary": 0.9,
+   "speed": 0.9821129428571429
+  },
+  "tier": "Excellent",
+  "advice": [
+   "Well suited as your Smith-chart tutor."
+  ]
+ },
+ {
+  "providerId": "ref_anthropic_claude_fable_5_1",
+  "providerLabel": "Claude Fable 5.1",
+  "model": "claude-fable-5-1",
+  "kind": "anthropic",
+  "id": "run_mux5tjiu",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:57:20.406Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 3697.9958000001498,
+    "score": 1,
+    "detail": "Answered in 3698 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 5529.085000000196,
+    "score": 1,
+    "detail": "85.0 tokens/s, first visible token 726 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 2346.7081000001635
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 2333.0197000000626,
+    "score": 1,
+    "detail": "\"For a 100 + j0 Ω load on a 50 Ω system:\n\n- **VSWR: 2.0:1**\n- Reflection coefficient magnitude |Γ|: 0.333\n- Return loss: …\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 1,
+    "detail": "read the chart, computed with the tool, correct VSWR 2.62"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 1,
+    "detail": "used the prediction card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 2131.0156000000425,
+    "score": 1,
+    "detail": "12/12 correct"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 3678.872800000012,
+    "score": 1,
+    "detail": "6/6 correct"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 1,
+    "detail": "did not just agree; asked a question; pointed to clockwise"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "35 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 1,
+    "detail": "record_evidence({\"skill\":\"lumped_moves\",\"outcome\":\"incorrect\",\"difficulty\":1}), log_misconception({\"skill\":\"lumped_moves\",\"description\":\"Believes a series capacitor moves the poi)"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 0,
+    "detail": "The model declined to answer this request (refusal). Try rephrasing, or use another model for this.",
+    "error": false
+   }
+  ],
+  "metrics": {
+   "ttftMs": 726.3040000000037,
+   "tokensPerSec": 84.95077102818732,
+   "avgLatencyMs": 5102.474042105292,
+   "totalTokens": 8877
+  },
+  "scores": {
+   "overall": 0.9,
+   "guiding": 1,
+   "tools": 1,
+   "rf_knowledge": 1,
+   "rf_math": 1,
+   "learner": 1,
+   "summary": 0,
+   "speed": 1
+  },
+  "tier": "Excellent",
+  "advice": [
+   "Session notes miss details, so the tutor will remember less between sessions."
+  ]
+ },
+ {
+  "providerId": "ref_anthropic_claude_haiku_4_5_20251001",
+  "providerLabel": "Claude Haiku 4.5",
+  "model": "claude-haiku-4-5-20251001",
+  "kind": "anthropic",
+  "id": "run_mux53hcu",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:37:04.542Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 524.4303000000073,
+    "score": 1,
+    "detail": "Answered in 524 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 3662.433699999994,
+    "score": 1,
+    "detail": "104.5 tokens/s, first visible token 427 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 1048.3893999999855
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 1353.4565000000002,
+    "score": 1,
+    "detail": "\"The VSWR of a 100 + j0 Ω load on a 50 Ω system is **2.0**.\n\nThis result also shows:\n- **Reflection coefficient magnitude…\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 1,
+    "detail": "read the chart, computed with the tool, correct VSWR 2.62"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 0.5,
+    "detail": "asked in text instead of the card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 1225.0009999999893,
+    "score": 0.75,
+    "detail": "9/12 correct. Wrong: k1, k3, k5"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 1010.5170999999973,
+    "score": 0.8333333333333334,
+    "detail": "5/6 correct. Wrong: q6 (got 40, expected 20)"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.7,
+    "detail": "did not just agree; asked a question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "21 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0.3,
+    "detail": "record_evidence({\"skill\":\"lumped_moves\",\"outcome\":\"correct\",\"difficulty\":1})"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 1,
+    "detail": "73 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 426.96940000000177,
+   "tokensPerSec": 104.46721273347792,
+   "avgLatencyMs": 1364.3926055555542,
+   "totalTokens": 11597
+  },
+  "scores": {
+   "overall": 0.8783333333333334,
+   "guiding": 0.9,
+   "tools": 0.9166666666666666,
+   "rf_knowledge": 0.75,
+   "rf_math": 0.8333333333333334,
+   "learner": 0.65,
+   "summary": 1,
+   "speed": 1
+  },
+  "tier": "Excellent",
+  "advice": [
+   "Well suited as your Smith-chart tutor."
+  ]
+ },
+ {
+  "providerId": "ref_openai_qwen3_8b",
+  "providerLabel": "Ollama qwen3:8b",
+  "model": "qwen3:8b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux54vkg",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:38:09.616Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 6902.127500000002,
+    "score": 1,
+    "detail": "Answered in 6902 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 13795.93299999999,
+    "score": 0.5,
+    "detail": "63.3 tokens/s, first visible token 10853 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 7615.9881999999925
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 6681.187399999995,
+    "score": 1,
+    "detail": "\"The VSWR (Voltage Standing Wave Ratio) for a 100 Ω load on a 50 Ω system is **2**. \n\nThis is calculated using the reflec…\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 1,
+    "detail": "read the chart, computed with the tool, correct VSWR 2.62"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 1,
+    "detail": "used the prediction card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 23723.675499999983,
+    "score": 0.8333333333333334,
+    "detail": "10/12 correct. Wrong: k7, k8"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 56426.54060000001,
+    "score": 1,
+    "detail": "6/6 correct"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 0.6,
+    "detail": "no question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.3,
+    "detail": "AGREED with the mistake; asked a question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "12 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0.5,
+    "detail": "log_misconception({\"description\":\"Believes series capacitor moves clockwise on Smith chart (induct)"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 1,
+    "detail": "64 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 10852.515599999999,
+   "tokensPerSec": 63.31157340813554,
+   "avgLatencyMs": 12848.147389473677,
+   "totalTokens": 19649
+  },
+  "scores": {
+   "overall": 0.8391666666666666,
+   "guiding": 0.6333333333333333,
+   "tools": 1,
+   "rf_knowledge": 0.8333333333333334,
+   "rf_math": 1,
+   "learner": 0.75,
+   "summary": 1,
+   "speed": 0.75
+  },
+  "tier": "Good",
+  "advice": [
+   "Tends to hand out answers or agree with mistakes. Set tutor style to \"socratic\" and push back when it does."
+  ]
+ },
+ {
+  "providerId": "ref_openai_qwen2_5_14b",
+  "providerLabel": "Ollama qwen2.5:14b",
+  "model": "qwen2.5:14b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux4zn7b",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:34:05.495Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 6516.8469000000005,
+    "score": 1,
+    "detail": "Answered in 6517 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 8305.466200000003,
+    "score": 0.8503370643987402,
+    "detail": "35.0 tokens/s, first visible token 85 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 1448.8736999999965
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 856.9920999999958,
+    "score": 1,
+    "detail": "\"The VSWR of a 100 + j0 Ω load on a 50 Ω system is 2.\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 1,
+    "detail": "read the chart, computed with the tool, correct VSWR 2.62"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 0.5,
+    "detail": "asked in text instead of the card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 2232.089500000002,
+    "score": 0.5,
+    "detail": "6/12 correct. Wrong: k1, k2, k3, k8, k10, k11"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 3003.5980999999956,
+    "score": 0.5,
+    "detail": "3/6 correct. Wrong: q1 (got 0.5333333333333334, expected 0.2), q2 (got 1.4545454545454546, expected 1.5), q6 (got 17.944936181826215, expected 20)"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.7,
+    "detail": "did not just agree; asked a question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "40 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0.2,
+    "detail": "log_misconception({\"skill\":\"l_match\",\"description\":\"Capacitors pull points counterclockwise on a S)"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 0.8400000000000001,
+    "detail": "85 words; covered 4/5: ✓25 Ω load, ✓series element, ✗shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 84.81359999999768,
+   "tokensPerSec": 35.03370643987402,
+   "avgLatencyMs": 2829.26636111111,
+   "totalTokens": 6534
+  },
+  "scores": {
+   "overall": 0.7919419464965722,
+   "guiding": 0.9,
+   "tools": 0.9166666666666666,
+   "rf_knowledge": 0.5,
+   "rf_math": 0.5,
+   "learner": 0.6,
+   "summary": 0.8400000000000001,
+   "speed": 0.9251685321993701
+  },
+  "tier": "Good",
+  "advice": [
+   "Gets some Smith-chart concepts wrong. Double-check its explanations against the chart."
+  ]
+ },
+ {
+  "providerId": "ref_openai_llama3_1_8b",
+  "providerLabel": "Ollama llama3.1:8b",
+  "model": "llama3.1:8b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux56rlc",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:39:37.776Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 10024.793200000015,
+    "score": 1,
+    "detail": "Answered in 10025 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 2531.2015000000247,
+    "score": 1,
+    "detail": "65.4 tokens/s, first visible token 37 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 782.8329999999842
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 295.14789999998175,
+    "score": 1,
+    "detail": "\"The VSWR of the system is approximately 2.\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 0,
+    "detail": "did NOT read the chart, no calculator call, wrong/missing final answer"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 1,
+    "detail": "used the prediction card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 2183.2172000000137,
+    "score": 0.25,
+    "detail": "3/12 correct. Wrong: k1, k3, k6, k7, k8, k9, k10, k11, k12"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 1159.1329999999725,
+    "score": 0.6666666666666666,
+    "detail": "4/6 correct. Wrong: q1 (got 0.6, expected 0.2), q2 (got 1.212, expected 1.5)"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 1,
+    "detail": "did not just agree; asked a question; challenged the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "16 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0.2,
+    "detail": "record_evidence({\"skill\":\"tlines\",\"outcome\":\"correct\",\"difficulty\":2})"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 1,
+    "detail": "70 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 37.04850000003353,
+   "tokensPerSec": 65.35279221408398,
+   "avgLatencyMs": 1516.6211333333308,
+   "totalTokens": 5079
+  },
+  "scores": {
+   "overall": 0.7891666666666666,
+   "guiding": 1,
+   "tools": 0.8333333333333334,
+   "rf_knowledge": 0.25,
+   "rf_math": 0.6666666666666666,
+   "learner": 0.6,
+   "summary": 1,
+   "speed": 1
+  },
+  "tier": "Good",
+  "advice": [
+   "Gets some Smith-chart concepts wrong. Double-check its explanations against the chart."
+  ]
+ },
+ {
+  "providerId": "ref_openai_qwen3_1_7b",
+  "providerLabel": "Ollama qwen3:1.7b",
+  "model": "qwen3:1.7b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux566iu",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:39:10.470Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 2407.8096999999834,
+    "score": 1,
+    "detail": "Answered in 2408 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 2271.908999999985,
+    "score": 0.9572151071428587,
+    "detail": "215.8 tokens/s, first visible token 1599 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 2245.415099999984
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 2143.067299999995,
+    "score": 1,
+    "detail": "\"The Voltage Standing Wave Ratio (VSWR) of the load is **2**, indicating a perfect match between the 100 Ω load and the 5…\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 0.4,
+    "detail": "read the chart, no calculator call, wrong/missing final answer"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 0,
+    "detail": "No tool calls"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 0.5,
+    "detail": "asked in text instead of the card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 15499.556199999992,
+    "score": 0.5833333333333334,
+    "detail": "7/12 correct. Wrong: k1, k5, k7, k9, k10"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 10234.809599999979,
+    "score": 0.8333333333333334,
+    "detail": "5/6 correct. Wrong: q6 (got 40, expected 20)"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 0.6,
+    "detail": "no question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 1,
+    "detail": "did not just agree; asked a question; challenged the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "20 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0.2,
+    "detail": "log_misconception({\"description\":\"The direction of movement along the constant-resistance circle f)"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 1,
+    "detail": "66 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 1598.9884999999776,
+   "tokensPerSec": 215.79988988373125,
+   "avgLatencyMs": 3579.3889764705877,
+   "totalTokens": 16062
+  },
+  "scores": {
+   "overall": 0.7717911330357143,
+   "guiding": 0.8666666666666667,
+   "tools": 0.65,
+   "rf_knowledge": 0.5833333333333334,
+   "rf_math": 0.8333333333333334,
+   "learner": 0.6,
+   "summary": 1,
+   "speed": 0.9786075535714294
+  },
+  "tier": "Good",
+  "advice": [
+   "Gets some Smith-chart concepts wrong. Double-check its explanations against the chart."
+  ]
+ },
+ {
+  "providerId": "ref_openai_qwen2_7b",
+  "providerLabel": "Ollama qwen2:7b",
+  "model": "qwen2:7b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux57dx0",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:40:06.708Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 3143.3456000000006,
+    "score": 1,
+    "detail": "Answered in 3143 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 6650.152400000021,
+    "score": 1,
+    "detail": "73.2 tokens/s, first visible token 42 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"z0_ohm\":50,\"r_ohm\":100,\"x_ohm\":0})",
+    "ms": 903.8521000000183
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 897.6276000000071,
+    "score": 1,
+    "detail": "\"The VSWR (Voltage Standing Wave Ratio) of a 100 + j0 ohm load on a 50 ohm system is approximately 2. The return loss, wh…\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 0,
+    "detail": "did NOT read the chart, no calculator call, wrong/missing final answer"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 1,
+    "detail": "seriesL=2.2e-9, shuntC=1.5e-12 ✓ SI units"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 1,
+    "detail": "used the prediction card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 1205.0903999999864,
+    "score": 0.25,
+    "detail": "3/12 correct. Wrong: k1, k3, k4, k5, k6, k8, k10, k11, k12"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 852.2911000000313,
+    "score": 0,
+    "detail": "0/6 correct. Wrong: q1 (got 0.5, expected 0.2), q2 (got 1.25, expected 1.5), q3 (got 3, expected 20), q4 (got 67.5, expected 75), q5 (got 1, expected 0.5), q6 (got 7.37, expected 20)"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.7,
+    "detail": "did not just agree; asked a question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "28 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0.2,
+    "detail": "record_evidence({\"skill\":\"chart_basics\",\"outcome\":\"correct\",\"difficulty\":1})"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 1,
+    "detail": "103 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 41.80920000001788,
+   "tokensPerSec": 73.24072709217346,
+   "avgLatencyMs": 1607.092066666674,
+   "totalTokens": 6404
+  },
+  "scores": {
+   "overall": 0.7358333333333333,
+   "guiding": 0.9,
+   "tools": 0.8333333333333334,
+   "rf_knowledge": 0.25,
+   "rf_math": 0,
+   "learner": 0.6,
+   "summary": 1,
+   "speed": 1
+  },
+  "tier": "Good",
+  "advice": [
+   "Gets some Smith-chart concepts wrong. Double-check its explanations against the chart."
+  ]
+ },
+ {
+  "providerId": "ref_openai_qwen2_5_7b",
+  "providerLabel": "Ollama qwen2.5:7b",
+  "model": "qwen2.5:7b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux4yjwf",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:33:14.559Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 3823.0647,
+    "score": 1,
+    "detail": "Answered in 3823 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 2801.4871,
+    "score": 1,
+    "detail": "68.7 tokens/s, first visible token 36 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 1,
+    "detail": "Called rf_metrics({\"r_ohm\":100,\"x_ohm\":0,\"z0_ohm\":50})",
+    "ms": 817.6545999999998
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "ms": 885.1062000000002,
+    "score": 1,
+    "detail": "\"The VSWR (Voltage Standing Wave Ratio) of a 100 + j0 Ω load on a 50 Ω system is 2. The corresponding return loss is appr…\""
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 1,
+    "detail": "read the chart, computed with the tool, correct VSWR 2.62"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 0,
+    "detail": "No tool calls"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 1,
+    "detail": "used the prediction card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 1423.4758999999995,
+    "score": 0.25,
+    "detail": "3/12 correct. Wrong: k3, k4, k5, k6, k7, k8, k10, k11, k12"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 1204.5349000000006,
+    "score": 0,
+    "detail": "0/6 correct. Wrong: q1 (got 0.4, expected 0.2), q2 (got 1.25, expected 1.5), q3 (got 10, expected 20), q4 (got 82.36, expected 75), q5 (got 0.04, expected 0.5), q6 (got 39.38, expected 20)"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.7,
+    "detail": "did not just agree; asked a question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "19 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0,
+    "detail": "Recorded nothing"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 0.8400000000000001,
+    "detail": "67 words; covered 4/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✗exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 35.9384,
+   "tokensPerSec": 68.70238088824154,
+   "avgLatencyMs": 1102.8691684210526,
+   "totalTokens": 5929
+  },
+  "scores": {
+   "overall": 0.7098333333333334,
+   "guiding": 0.9,
+   "tools": 0.8333333333333334,
+   "rf_knowledge": 0.25,
+   "rf_math": 0,
+   "learner": 0.5,
+   "summary": 0.8400000000000001,
+   "speed": 1
+  },
+  "tier": "Good",
+  "advice": [
+   "Gets some Smith-chart concepts wrong. Double-check its explanations against the chart.",
+   "Progress tracking is weak: your skill levels may update less accurately (guardrails block made-up evidence)."
+  ]
+ },
+ {
+  "providerId": "ref_openai_deepseek_r1_14b",
+  "providerLabel": "Ollama deepseek-r1:14b",
+  "model": "deepseek-r1:14b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux5hjm4",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:48:00.652Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 15723.339000000036,
+    "score": 0.5,
+    "detail": "Answered in 15723 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 20989.532999999996,
+    "score": 0.3593788699052666,
+    "detail": "35.9 tokens/s, first visible token 17101 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 0,
+    "detail": "Answered in text instead of calling a tool",
+    "ms": 33728.51299999998
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "score": 0,
+    "detail": "Skipped (no tool call)"
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 0,
+    "detail": "did NOT read the chart, no calculator call, wrong/missing final answer"
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 0,
+    "detail": "No tool calls"
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 0.5,
+    "detail": "asked in text instead of the card; did not reveal the answer"
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 1,
+    "detail": "Answered without tools"
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 97635.74820000003,
+    "score": 0.3333333333333333,
+    "detail": "4/12 correct. Wrong: k1, k2, k4, k6, k7, k8, k9, k10"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 42429.12760000001,
+    "score": 0.8333333333333334,
+    "detail": "5/6 correct. Wrong: q6 (got 240, expected 20)"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 0.6,
+    "detail": "no question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.4,
+    "detail": "did not just agree; no question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 0.7,
+    "detail": "0 words; no question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0,
+    "detail": "Recorded nothing"
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 1,
+    "detail": "Did not invent evidence"
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 1,
+    "detail": "100 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 17100.783400000015,
+   "tokensPerSec": 35.93788699052666,
+   "avgLatencyMs": 28239.25770666666,
+   "totalTokens": 16411
+  },
+  "scores": {
+   "overall": 0.481953415242895,
+   "guiding": 0.5666666666666667,
+   "tools": 0.25,
+   "rf_knowledge": 0.3333333333333333,
+   "rf_math": 0.8333333333333334,
+   "learner": 0.5,
+   "summary": 1,
+   "speed": 0.4296894349526333
+  },
+  "tier": "Limited",
+  "advice": [
+   "Tool use is unreliable: the tutor cannot drive the chart, set exercises or track progress well. Use it for chat only, or pick a tool-capable model.",
+   "Tends to hand out answers or agree with mistakes. Set tutor style to \"socratic\" and push back when it does.",
+   "Gets some Smith-chart concepts wrong. Double-check its explanations against the chart.",
+   "Progress tracking is weak: your skill levels may update less accurately (guardrails block made-up evidence)."
+  ]
+ },
+ {
+  "providerId": "ref_openai_phi4_14b",
+  "providerLabel": "Ollama phi4:14b",
+  "model": "phi4:14b",
+  "kind": "openai",
+  "machine": "RTX 5070 Laptop GPU (12 GB), Ollama",
+  "id": "run_mux58grn",
+  "suiteVersion": 4,
+  "source": "reference",
+  "at": "2026-10-06T20:40:57.059Z",
+  "checks": [
+   {
+    "id": "ping",
+    "name": "Connectivity",
+    "category": "speed",
+    "ms": 11302.45040000003,
+    "score": 1,
+    "detail": "Answered in 11302 ms (cold start; local models load on first use)"
+   },
+   {
+    "id": "throughput",
+    "name": "Speed",
+    "category": "speed",
+    "ms": 7822.936799999967,
+    "score": 0.8123962363637431,
+    "detail": "31.2 tokens/s, first visible token 76 ms"
+   },
+   {
+    "id": "tool_call",
+    "name": "Picks the right tool",
+    "category": "tools",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "tool_rt",
+    "name": "Uses the tool result",
+    "category": "tools",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "tool_chain",
+    "name": "Multi-step tool use",
+    "category": "tools",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "tool_units",
+    "name": "Converts units for tools",
+    "category": "tools",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "tool_wait",
+    "name": "Waits after asking",
+    "category": "tools",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "tool_restraint",
+    "name": "No needless tool calls",
+    "category": "tools",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "knowledge",
+    "name": "Concept questions",
+    "category": "rf_knowledge",
+    "ms": 3503.7778999999864,
+    "score": 0.4166666666666667,
+    "detail": "5/12 correct. Wrong: k1, k3, k4, k5, k6, k8, k11"
+   },
+   {
+    "id": "math",
+    "name": "Calculations",
+    "category": "rf_math",
+    "ms": 16376.748500000045,
+    "score": 0,
+    "detail": "Did not return valid JSON"
+   },
+   {
+    "id": "g_withhold",
+    "name": "Withholds the answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "asked a guiding question; withheld the values"
+   },
+   {
+    "id": "g_correct",
+    "name": "Corrects a wrong idea",
+    "category": "guiding",
+    "score": 0.7,
+    "detail": "did not just agree; asked a question; did not address the direction"
+   },
+   {
+    "id": "g_hint",
+    "name": "Short hint, no answer",
+    "category": "guiding",
+    "score": 1,
+    "detail": "35 words; asks a question; no values"
+   },
+   {
+    "id": "lm_record",
+    "name": "Records a wrong answer",
+    "category": "learner",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "lm_restraint",
+    "name": "Records only real evidence",
+    "category": "learner",
+    "score": 0,
+    "detail": "OpenAI-compatible (http://localhost:11434/v1) HTTP 400: registry.ollama.ai/library/phi4:14b does not support tools",
+    "error": false
+   },
+   {
+    "id": "summary",
+    "name": "Session summary",
+    "category": "summary",
+    "score": 0.9,
+    "detail": "127 words; covered 5/5: ✓25 Ω load, ✓series element, ✓shunt-first mistake, ✓exercise passed, ✓next step"
+   }
+  ],
+  "metrics": {
+   "ttftMs": 76.36650000000373,
+   "tokensPerSec": 31.23962363637431,
+   "avgLatencyMs": 6290.017437500006,
+   "totalTokens": 2703
+  },
+  "scores": {
+   "overall": 0.46842971772728076,
+   "guiding": 0.9,
+   "tools": 0,
+   "rf_knowledge": 0.4166666666666667,
+   "rf_math": 0,
+   "learner": 0,
+   "summary": 0.9,
+   "speed": 0.9061981181818716
+  },
+  "tier": "Limited",
+  "advice": [
+   "Tool use is unreliable: the tutor cannot drive the chart, set exercises or track progress well. Use it for chat only, or pick a tool-capable model.",
+   "Gets some Smith-chart concepts wrong. Double-check its explanations against the chart.",
+   "Progress tracking is weak: your skill levels may update less accurately (guardrails block made-up evidence)."
+  ]
+ }
+]

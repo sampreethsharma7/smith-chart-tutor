@@ -1,0 +1,19 @@
+# Dependencies and build output
+node_modules/
+out/
+dist/
+release/
+
+# Logs and local tooling
+*.log
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets and local data (the app keeps user data outside the repo; never commit any of these)
+.env
+.env.*
+keys.json
+settings.json

@@ -1,0 +1,38 @@
+{
+  "name": "smith-tutor",
+  "version": "0.1.0",
+  "description": "Interactive Smith chart with an agentic, multi-provider AI tutor",
+  "main": "./out/main/index.js",
+  "author": "Sampreeth Sharma",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "katex": "^0.16.47",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.5.1",
+    "electron-vite": "^5.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7",
+    "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "electron@44.5.1": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true
+  }
+}
