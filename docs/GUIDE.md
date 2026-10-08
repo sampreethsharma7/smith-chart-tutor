@@ -17,7 +17,9 @@ A desktop Smith chart with an agentic AI tutor. The chart shows every metric (Z,
 
 ## Run
 
-Most people should use the one-click start: extract the ZIP and double-click `Start-Windows.cmd`, `Start-Mac.command` or `Start-Linux.sh` (see the [README](../README.md#getting-started)). It needs no admin rights: a private Node.js goes into `.runtime/` in the app folder, then [scripts/launch.mjs](../scripts/launch.mjs) installs, builds and starts the app, redoing a step only when its inputs changed. `--no-launch` stops before starting the app.
+Most people should download the ready-built app from the [latest release](https://github.com/sampreethsharma7/smith-chart-tutor/releases/latest): a Windows installer or portable `.exe`, a Mac `.dmg` or a Linux AppImage / `.deb`, made by [the release workflow](../.github/workflows/release.yml) with [electron-builder](../electron-builder.yml). They are unsigned for now, so the first start asks once (see the [README](../README.md#getting-started)).
+
+To run from source without installing anything, use the one-click start: extract the ZIP and double-click `Start-Windows.cmd`, `Start-Mac.command` or `Start-Linux.sh` (see the [README](../README.md#getting-started)). It needs no admin rights: a private Node.js goes into `.runtime/` in the app folder, then [scripts/launch.mjs](../scripts/launch.mjs) installs, builds and starts the app, redoing a step only when its inputs changed. `--no-launch` stops before starting the app.
 
 For development:
 

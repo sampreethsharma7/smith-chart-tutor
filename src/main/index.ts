@@ -183,6 +183,10 @@ async function autoStartOllama() {
 // Dev aids (scripted runs, benchmarks, a throwaway data folder) are for development only.
 if (app.isPackaged) for (const k of Object.keys(process.env)) if (k.startsWith('SMITH_')) delete process.env[k]
 
+// One data folder for every way of running the app (the downloaded app is named "Smith Chart Tutor",
+// the start-file version "smith-tutor"): switching between them keeps the profile, keys and progress.
+app.setPath('userData', join(app.getPath('appData'), 'smith-tutor'))
+
 // Dev aid: run against a throwaway data folder.
 if (process.env.SMITH_USERDATA) app.setPath('userData', process.env.SMITH_USERDATA)
 

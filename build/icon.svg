@@ -1,0 +1,35 @@
+<svg style="display:block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- The app icon: a Smith chart with an L-match from the load (orange) to the centre (green). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#16213a"/>
+    </linearGradient>
+    <linearGradient id="path" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#f472b6"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <clipPath id="disc"><circle cx="512" cy="512" r="380"/></clipPath>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="200" fill="url(#bg)"/>
+  <g fill="none" stroke="#5b6b86" stroke-width="7" opacity="0.85">
+    <line x1="132" y1="512" x2="892" y2="512"/>
+    <circle cx="638.7" cy="512" r="253.3"/>
+    <circle cx="702" cy="512" r="190"/>
+    <circle cx="765.3" cy="512" r="126.7"/>
+    <g clip-path="url(#disc)">
+      <circle cx="892" cy="-248" r="760"/>
+      <circle cx="892" cy="1272" r="760"/>
+      <circle cx="892" cy="132" r="380"/>
+      <circle cx="892" cy="892" r="380"/>
+      <circle cx="892" cy="322" r="190"/>
+      <circle cx="892" cy="702" r="190"/>
+    </g>
+  </g>
+  <circle cx="512" cy="512" r="380" fill="none" stroke="#8fa3c4" stroke-width="12"/>
+  <circle cx="322" cy="512" r="190" fill="none" stroke="#a78bfa" stroke-width="9" stroke-dasharray="30 24" opacity="0.9"/>
+  <path d="M 455.2 686.8 A 253.3 253.3 0 0 1 436 360" fill="none" stroke="#f472b6" stroke-width="22" stroke-linecap="round"/>
+  <path d="M 436 360 A 190 190 0 0 1 512 512" fill="none" stroke="url(#path)" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="455.2" cy="686.8" r="34" fill="#f59e0b" stroke="#0b1220" stroke-width="10"/>
+  <circle cx="512" cy="512" r="34" fill="#34d399" stroke="#0b1220" stroke-width="10"/>
+</svg>

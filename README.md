@@ -6,7 +6,7 @@
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-276%20passing-34d399">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-282%20passing-34d399">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a78bfa">
 </p>
 
@@ -163,53 +163,75 @@ The memory lives in the app, not the model, so it's the same whichever model tea
 
 ## Getting started
 
-**No admin rights, no installers, nothing to set up first.** This works on locked-down work and university laptops.
+**No admin rights needed.** This works on locked-down work and university laptops.
 
-1. **Download** the ZIP (green **Code** button → **Download ZIP**). On Windows, first right-click the ZIP → **Properties** → tick **Unblock** → **OK**. This stops Windows from blocking the app as "downloaded from the internet". Then **extract** it somewhere in your user folder, for example `Documents\SmithChartTutor`.
-2. **Double-click the start file for your system:**
+### Download the app (recommended)
 
-   | Windows 10 / 11 | macOS | Linux |
-   |---|---|---|
-   | `Start-Windows.cmd` | `Start-Mac.command` | `Start-Linux.sh` |
+Go to the **[latest release](https://github.com/sampreethsharma7/smith-chart-tutor/releases/latest)** and download the file for your computer:
 
-That's all. The first run takes a few minutes. It downloads a private copy of Node.js (checked against its official checksum), installs the app's components and builds the app, all **inside that folder**. After that, a double-click starts the app in seconds.
+| Your computer | Download | Then |
+|---|---|---|
+| **Windows 10 / 11** | `…-Windows-Setup.exe` | Double-click it. It installs for your account only, then opens the app and adds it to the Start menu and the desktop. |
+| | `…-Windows-Portable.exe` | Nothing to install: double-click it whenever you want to use the app, for example from a USB stick. |
+| **Mac with Apple Silicon** (M1 or newer) | `…-Mac-arm64.dmg` | Open it and drag **Smith Chart Tutor** into **Applications**. |
+| **Mac with Intel** | `…-Mac-x64.dmg` | The same. (Apple menu → **About This Mac** shows which chip you have.) |
+| **Linux** | `…-linux-x86_64.AppImage` | Make it executable (right-click → **Properties** → **Allow executing**), then double-click it. On Ubuntu and Debian, the `.deb` installs it into your apps menu instead. |
+
+<details>
+<summary><b>The first time: "Windows protected your PC" or "Apple could not verify…"</b></summary>
+
+The app isn't code-signed yet, because a signing certificate costs money every year. So your computer asks once before the first start:
+
+- **Windows, "Windows protected your PC":** click **More info** → **Run anyway**.
+- **Windows, "Smart App Control blocked…":** right-click the downloaded file → **Properties** → tick **Unblock** → **OK**, then double-click it again. Unblock needs no admin rights; turning Smart App Control off does, and isn't needed.
+- **macOS, "Apple could not verify…":** click **Done**, open **System Settings → Privacy & Security**, scroll down to the message about Smith Chart Tutor and click **Open Anyway**. You only do this once.
+
+</details>
 
 Then pick a tutor model in the **Models** tab. You have two options:
 
 - **A free local tutor, in one click.** The app checks your computer (its GPU and memory) and recommends the local model that scored best on its tutor benchmark and fits your machine. It then sets up [Ollama](https://ollama.com) without admin rights, downloads the model, and measures how fast it really runs on your computer before you rely on it. No key, no cost, and it works offline.
 - **A cloud model,** such as Claude, Gemini or GPT. Paste an API key, and the app links to where to get one. These are faster and stronger, and paid.
 
-<details>
-<summary><b>First time on macOS or Windows: the "can't be opened" / "protected your PC" warning</b></summary>
+**Updating:** download the new version and install or open it the same way: the installer replaces the old version. Your profiles, progress and keys are kept separately in your user data folder, so they carry over.
 
-Files downloaded from the internet get one extra check the first time:
+**Uninstalling:**
+
+1. Remove the app:
+   - **Windows:** **Settings → Apps → Installed apps → Smith Chart Tutor → Uninstall**. For the portable version, just delete the file.
+   - **macOS:** drag **Smith Chart Tutor** from **Applications** to the Trash.
+   - **Linux:** delete the AppImage, or `sudo apt remove smith-tutor` for the `.deb`.
+2. If you used the free local tutor, also delete:
+   - the app's Ollama copy (Windows `%LOCALAPPDATA%\SmithChartTutor`; macOS `~/Library/Application Support/SmithChartTutor`; Linux `~/.local/share/SmithChartTutor`)
+   - the models, in `.ollama` in your home folder. Keep this one if you use Ollama for other things.
+3. To remove your profiles and keys too, use **Profiles → Open data folder** before step 1, and delete that folder.
+
+### Or run it from the source ZIP
+
+If a download is blocked where you are, or you want the very latest changes, the source ZIP runs with a double-click too. It builds the app on your computer the first time.
+
+1. **Download** the ZIP (green **Code** button → **Download ZIP**). On Windows, first right-click the ZIP → **Properties** → tick **Unblock** → **OK**. Then **extract** it somewhere in your user folder, for example `Documents\SmithChartTutor`.
+2. **Double-click the start file for your system:**
+
+   | Windows 10 / 11 | macOS | Linux |
+   |---|---|---|
+   | `Start-Windows.cmd` | `Start-Mac.command` | `Start-Linux.sh` |
+
+The first run takes a few minutes. It downloads a private copy of Node.js (checked against its official checksum), installs the app's components and builds the app, all **inside that folder**. After that, a double-click starts the app in seconds. Both ways of running the app share the same profiles and progress.
+
+<details>
+<summary><b>Start file warnings, company networks and proxies</b></summary>
 
 - **macOS:** if it says the file can't be opened, **right-click** `Start-Mac.command` → **Open** → **Open**. If it says you don't have permission, open Terminal and run `bash ` followed by a space, then drag the file into the Terminal window and press Enter.
-- **Windows:** if SmartScreen says "Windows protected your PC", click **More info** → **Run anyway**.
-- **Windows, "Smart App Control blocked…":** delete the extracted folder, right-click the ZIP → **Properties** → tick **Unblock** → **OK**, and extract it again. Unblock needs no admin rights; turning Smart App Control off does, and isn't needed.
-
-</details>
-
-<details>
-<summary><b>On a company network, behind a proxy, or something went wrong?</b></summary>
-
+- **Windows:** "Windows protected your PC" → **More info** → **Run anyway**. "Smart App Control blocked…" → delete the extracted folder, **Unblock** the ZIP as in step 1, and extract it again.
 - The first run downloads from `nodejs.org`, `registry.npmjs.org` and `github.com`, about 150 MB, and uses about 600 MB of disk.
 - Your company's HTTPS certificates are trusted automatically, the same way your browser trusts them.
 - **Behind a proxy:** set `HTTPS_PROXY` (for example `http://proxy.company.com:8080`) before starting, or ask IT to allow those three sites.
 - **Something stopped halfway:** just double-click the start file again. It carries on where it stopped. If that doesn't help, delete the hidden `.runtime` folder and try again.
 - **Avoid synced folders:** the app works best outside OneDrive or Dropbox folders, which slow down installs with many small files.
+- **Updating:** download the new ZIP and extract it (into a new folder, or over the old one). **Uninstalling:** delete the folder, then follow steps 2 and 3 above.
 
 </details>
-
-**Updating:** download the new ZIP, extract it (into a new folder, or over the old one), and start it the same way. Your profiles, progress and keys are kept separately in your user data folder, so they carry over.
-
-**Uninstalling:**
-
-1. Delete the app folder.
-2. If you used the free local tutor, also delete:
-   - the app's Ollama copy (Windows `%LOCALAPPDATA%\SmithChartTutor`; macOS `~/Library/Application Support/SmithChartTutor`; Linux `~/.local/share/SmithChartTutor`)
-   - the models, in `.ollama` in your home folder. Keep this one if you use Ollama for other things.
-3. To remove your profiles and keys too, use **Profiles → Open data folder** before step 1, and delete that folder.
 
 **In the app:**
 
@@ -237,7 +259,7 @@ Commands:
 npm run dev         # development, with hot reload
 npm run build       # production build into out/
 npm start           # run the production build
-npm test            # 276 tests: RF engine, importers, grading, learner model, the agent loop end to end
+npm test            # 282 tests: RF engine, importers, grading, learner model, the agent loop end to end
 npm run typecheck
 ```
 
@@ -263,6 +285,8 @@ src/
    ├─ views/ panels/  React UI
    └─ state/          zustand stores
 ```
+
+Around it: `Start-*` and [`scripts/`](scripts/) are the one-click start from source; [`electron-builder.yml`](electron-builder.yml), [`build/`](build/) (the app icon) and [`.github/workflows/release.yml`](.github/workflows/release.yml) make the downloads on the Releases page.
 
 **Adding a tool** means dropping a file into [`src/renderer/src/agent/tools/`](src/renderer/src/agent/tools/). It's picked up automatically, and the tutor decides when to use it. The [guide](docs/GUIDE.md#the-tutor-is-agentic-adding-tools) shows the shape of one.
 

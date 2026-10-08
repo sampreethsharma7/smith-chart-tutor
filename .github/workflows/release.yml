@@ -1,0 +1,67 @@
+# Builds the ready-made downloads (Windows installer + portable, Mac dmg/zip, Linux AppImage/deb).
+#
+#   Pushing a version tag, e.g.  git tag v0.1.0 && git push origin v0.1.0
+#   (the tag must match "version" in package.json), uploads them to a DRAFT release:
+#   check it on the Releases page, then press "Publish release" to make it public.
+#
+#   Running it by hand (Actions → Release → Run workflow) only builds, and keeps the files as
+#   downloadable artifacts of that run: handy for trying a build before tagging.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # to create the draft release and upload to it
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "v$v" = "${GITHUB_REF_NAME}" ] || { echo "Tag ${GITHUB_REF_NAME} doesn't match package.json version $v"; exit 1; }
+
+      - run: npm run build
+
+      - name: Package
+        shell: bash
+        run: npx --yes electron-builder@26.15.3 --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the files (manual runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: smith-chart-tutor-${{ runner.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error

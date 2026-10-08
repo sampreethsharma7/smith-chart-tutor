@@ -1,0 +1,67 @@
+# Ready-built downloads (GitHub Releases), made by .github/workflows/release.yml when a version tag
+# is pushed. Unsigned for now: Windows shows "More info → Run anyway" once, a Mac "Open Anyway".
+appId: io.github.sampreethsharma7.smithcharttutor
+productName: Smith Chart Tutor
+copyright: Copyright © 2026 Sampreeth Sharma
+directories:
+  buildResources: build
+  output: release
+# The built app is self-contained (out/): nothing from node_modules is needed at runtime.
+files:
+  - out/**/*
+  - package.json
+  - '!node_modules/**/*'
+  - '!out/.build-stamp'
+npmRebuild: false
+# Locked-down Electron: it can't be made to run as plain Node.js or load code from outside the app
+# (VS Code and some tools set ELECTRON_RUN_AS_NODE, which would otherwise make the app exit at once).
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  resetAdHocDarwinSignature: true
+artifactName: Smith-Chart-Tutor-${version}-${os}-${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+# Installs for this Windows user only: no admin rights, works on managed laptops.
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: Smith-Chart-Tutor-${version}-Windows-Setup.${ext}
+  shortcutName: Smith Chart Tutor
+portable:
+  artifactName: Smith-Chart-Tutor-${version}-Windows-Portable.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  category: public.app-category.education
+  identity: '-' # ad-hoc: lets Apple Silicon run it; still unsigned for Gatekeeper ("Open Anyway")
+dmg:
+  artifactName: Smith-Chart-Tutor-${version}-Mac-${arch}.${ext}
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  category: Education
+  maintainer: Sampreeth Sharma <120058877+sampreethsharma7@users.noreply.github.com>
+
+# Uploaded to a draft release: nothing is public until the draft is published on GitHub.
+publish:
+  provider: github
+  owner: sampreethsharma7
+  repo: smith-chart-tutor
+  releaseType: draft
