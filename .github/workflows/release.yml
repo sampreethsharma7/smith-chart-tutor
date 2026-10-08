@@ -17,7 +17,21 @@ permissions:
   contents: write # to create the draft release and upload to it
 
 jobs:
+  # One draft first, so the three builds upload into the same release instead of racing to create one each.
+  draft:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --title "${GITHUB_REF_NAME#v}" --notes "Download the file for your computer: the [README](https://github.com/$GITHUB_REPOSITORY#getting-started) says which one, and what to click the first time."
+
   build:
+    needs: draft
+    if: ${{ !cancelled() && needs.draft.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
