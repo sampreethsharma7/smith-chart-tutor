@@ -16,8 +16,9 @@
  * Cleared is provisional: a clean answer in a later lesson confirms it; a slip brings it back with
  * a higher bar. The app decides, from the record; the tutor reports it in these words.
  */
-import type { Profile } from './profile'
-import type { TopicId, TopicStat } from './memory'
+import { skillName, type Profile, type SkillId } from './profile'
+// memory.ts imports this module too; topicDef is only used inside functions, so the cycle is safe.
+import { topicDef, type TopicId, type TopicStat } from './memory'
 
 export type SignOffStatus = 'active' | 'improving' | 'cleared' | 'confirmed'
 
@@ -29,68 +30,125 @@ export const SIGNOFF_WORDS: Record<SignOffStatus, string> = {
   confirmed: 'confirmed'
 }
 
-// ── This learner's track record ─────────────────────────────────────────────
+// ── This learner's track record, where the mistake is ───────────────────────
+
+/**
+ * The one tunable: how many answers' (or cleared mistakes') worth of weight the level above
+ * carries at each step: default → this learner → the skill → the topic. Larger is more cautious
+ * (the record has to be longer before it moves the bar); smaller trusts thin records sooner.
+ * The same strength also weighs the whole adjustment by how much history there is.
+ */
+export const SHRINK_STRENGTH = 15
+
+/** Where a mistake is: its topic (if it has one) and its skill. Patterns across skills use neither. */
+export interface Scope {
+  topic?: TopicId
+  skill?: SkillId
+}
+
+type Layer = 'topic' | 'skill' | 'learner'
 
 export interface Track {
-  /** Share of cleared mistakes that came back (shrunk toward the default) */
+  /** Share of cleared mistakes that came back, here (shrunk layer by layer toward the default) */
   relapse: number
-  /** Share of graded answers right (shrunk toward the default) */
+  /** Share of graded answers right, here */
   pace: number
-  /** Share of "sure" answers right (shrunk toward the default) */
+  /** Share of "sure" answers right, here */
   sureRight: number
   /** −1 (needs more drilling) … 0 (default) … +1 (quick, and it sticks) */
   factor: number
-  /** How much history there is behind it */
-  n: { cleared: number; answers: number; sure: number }
-  /** Why, in a few words for the learner ("you usually keep what you learn") */
+  /** How much history there is behind it: answers and cleared mistakes, overall and here */
+  n: { answers: number; cleared: number; sure: number; here: number }
+  /** Why, in a few words for the learner ("a higher bar: transmission lines have taken you a few tries") */
   why: string
 }
 
-/** Defaults a new learner is assumed to have, and how many answers' worth of weight they carry. */
-const PRIOR = { relapse: 0.3, relapseWeight: 3, pace: 0.65, paceWeight: 12, sureRight: 0.8, sureWeight: 6 }
+/** What a new learner is assumed to have. */
+const PRIOR = { relapse: 0.3, pace: 0.65, sureRight: 0.8 }
 const clamp = (x: number, lo = -1, hi = 1) => Math.max(lo, Math.min(hi, x))
-const shrink = (hits: number, n: number, prior: number, weight: number) => (hits + prior * weight) / (n + weight)
+const shrink = (hits: number, n: number, toward: number, k: number) => (hits + toward * k) / (n + k)
 
-export function trackOf(p: Profile): Track {
+/** A rate estimated layer by layer: the learner's toward the default, the skill's toward the learner's, the topic's toward the skill's. */
+function layered(counts: Record<Layer, { hits: number; n: number }>, prior: number, k: number) {
+  const learner = shrink(counts.learner.hits, counts.learner.n, prior, k)
+  const skill = shrink(counts.skill.hits, counts.skill.n, learner, k)
+  const topic = shrink(counts.topic.hits, counts.topic.n, skill, k)
+  return { rate: topic, rates: { learner, skill, topic } as Record<Layer, number>, n: { learner: counts.learner.n, skill: counts.skill.n, topic: counts.topic.n } as Record<Layer, number>, prior }
+}
+
+/**
+ * This learner's record where the mistake is (scope): their topic record, shrunk toward their
+ * skill record, shrunk toward their overall record, shrunk toward the default, each step with the
+ * same strength. Someone quick with admittance but slow with lines gets a lower bar for an
+ * admittance mistake and a higher one for a lines mistake; a topic they haven't tried follows its
+ * skill, and a skill they haven't tried follows their overall record.
+ */
+export function trackOf(p: Profile, scope: Scope = {}, k = SHRINK_STRENGTH): Track {
+  const skillOfTopic = (t?: string) => (t ? topicDef(t)?.skill : undefined)
+  const skill = scope.skill ?? skillOfTopic(scope.topic)
+  const inLayer = (layer: Layer, topic?: string, sk?: string) =>
+    layer === 'learner' ? true : layer === 'skill' ? !!skill && (sk ?? skillOfTopic(topic)) === skill : !!scope.topic && topic === scope.topic
+  const count = <T,>(items: T[], where: (x: T, layer: Layer) => boolean, n: (x: T) => number, hits: (x: T) => number) =>
+    Object.fromEntries((['learner', 'skill', 'topic'] as Layer[]).map((l) => {
+      const xs = items.filter((x) => where(x, l))
+      return [l, { n: xs.reduce((a, x) => a + n(x), 0), hits: xs.reduce((a, x) => a + hits(x), 0) }]
+    })) as Record<Layer, { hits: number; n: number }>
+
   // Retention: mistakes that were cleared at some point, and how often they came back.
   const ms = p.misconceptions ?? []
-  const relapses = ms.reduce((a, m) => a + (m.relapses ?? 0), 0)
-  const clearedEver = ms.filter((m) => m.resolved || (m.relapses ?? 0) > 0).length
-  const clearings = clearedEver + relapses // each relapse means it had been cleared once more
-  const relapse = shrink(relapses, clearings, PRIOR.relapse, PRIOR.relapseWeight)
-  // Pace: how often they're right across graded answers.
-  const stats = Object.values(p.topics ?? {}) as TopicStat[]
-  const seen = stats.reduce((a, t) => a + t.seen, 0)
-  const correct = stats.reduce((a, t) => a + t.correct, 0)
-  const pace = shrink(correct, seen, PRIOR.pace, PRIOR.paceWeight)
+  const retention = count(ms, (m, l) => inLayer(l, m.topic, m.skill), (m) => (m.resolved || (m.relapses ?? 0) > 0 ? 1 : 0) + (m.relapses ?? 0), (m) => m.relapses ?? 0)
+  // Pace: how often they're right on graded answers.
+  const topics = Object.entries(p.topics ?? {}) as Array<[TopicId, TopicStat]>
+  const pace = count(topics, ([t], l) => inLayer(l, t), ([, s]) => s.seen, ([, s]) => s.correct)
   // Calibration: when they say they're sure, are they right?
   const sure = (p.calibration ?? []).filter((c) => c.sure === 'sure')
-  const sureRight = shrink(sure.filter((c) => c.right).length, sure.length, PRIOR.sureRight, PRIOR.sureWeight)
+  const calib = count(sure, (c, l) => inLayer(l, c.topic), () => 1, (c) => (c.right ? 1 : 0))
 
-  const keeps = clamp((PRIOR.relapse - relapse) / PRIOR.relapse)
-  const quick = clamp((pace - PRIOR.pace) / (1 - PRIOR.pace))
-  const judges = clamp((sureRight - PRIOR.sureRight) / (1 - PRIOR.sureRight))
-  // Each part is already pulled toward the default; the whole is also scaled by how much history
-  // there is, so a handful of answers (one of them counted in pace and calibration both) can't move
-  // the bar: 3 answers ≈ 15 % of the way, 60 answers ≈ 80 %.
-  const history = seen + 2 * clearings
-  const raw = (0.4 * keeps + 0.35 * quick + 0.25 * judges) * (history / (history + 15))
-  // Small differences are noise: treat them as the default.
-  const factor = Math.abs(raw) < 0.15 ? 0 : clamp(raw)
+  const rel = layered(retention, PRIOR.relapse, k)
+  const pc = layered(pace, PRIOR.pace, k)
+  const sr = layered(calib, PRIOR.sureRight, k)
+  const keeps = clamp((PRIOR.relapse - rel.rate) / PRIOR.relapse)
+  const quick = clamp((pc.rate - PRIOR.pace) / (1 - PRIOR.pace))
+  const judges = clamp((sr.rate - PRIOR.sureRight) / (1 - PRIOR.sureRight))
+  // The whole is weighed by how much history there is (same strength), so a handful of answers,
+  // one of them counted in pace and calibration both, can't move the bar.
+  const history = pace.learner.n + 2 * retention.learner.n
+  const factor = clamp((0.4 * keeps + 0.35 * quick + 0.25 * judges) * (history / (history + k)))
 
-  // The reasons, in words: each clear one; when none is clear on its own, the one that weighs most.
-  const parts = [
-    { v: 0.4 * keeps, up: 'you usually keep what you learn', down: 'some of your fixes have come back before' },
-    { v: 0.35 * quick, up: 'you pick things up quickly', down: 'these topics have taken you a few tries' },
-    { v: 0.25 * judges, up: 'when you are sure, you are right', down: 'you have been sure of wrong answers before' }
-  ]
+  // Why, in words: each clear reason, named after the most specific place that has its own record,
+  // points that way, and is at least as far that way as the level above it (so it isn't just
+  // borrowing the learner's overall record).
+  type Rates = ReturnType<typeof layered>
+  const parent: Record<'topic' | 'skill', Layer> = { topic: 'skill', skill: 'learner' }
+  const where = (r: Rates, better: number): Layer =>
+    (['topic', 'skill'] as const).find((l) => r.n[l] > 0 && (r.rates[l] - r.prior) * better > 0 && (r.rates[l] - r.rates[parent[l]]) * better >= 0) ?? 'learner'
+  const topicName = scope.topic ? topicDef(scope.topic)?.name : undefined
+  const skillLabel = skill ? skillName(skill) : undefined
+  const subject = (l: Layer) => (l === 'topic' && topicName ? topicName : l !== 'learner' && skillLabel ? skillLabel : undefined)
   const sign = Math.sign(factor)
-  const clear = parts.filter((x) => x.v * sign >= 0.3 * 0.25)
-  const named = (clear.length ? clear : [...parts].sort((a, b) => b.v * sign - a.v * sign).slice(0, 1)).map((x) => (sign > 0 ? x.up : x.down))
-  const why = factor === 0
-    ? clearings + seen < 15 ? 'not much history yet, so the standard bar' : 'the standard bar'
-    : `${factor > 0 ? 'a lower bar' : 'a higher bar'}: ${named.join('; ')}`
-  return { relapse, pace, sureRight, factor, n: { cleared: clearings, answers: seen, sure: sure.length }, why }
+  const parts = [
+    { v: 0.4 * keeps, rates: rel, better: -sign, // fewer relapses is better
+      up: (s?: string) => (s ? `your fixes on ${s} usually stick` : 'you usually keep what you learn'),
+      down: (s?: string) => (s ? `some fixes on ${s} have come back before` : 'some of your fixes have come back before') },
+    { v: 0.35 * quick, rates: pc, better: sign,
+      up: (s?: string) => (s ? `you pick up ${s} quickly` : 'you pick things up quickly'),
+      down: (s?: string) => (s ? `you've needed a few tries on ${s}` : 'new topics have taken you a few tries') },
+    { v: 0.25 * judges, rates: sr, better: sign,
+      up: (s?: string) => (s ? `when you are sure about ${s}, you are right` : 'when you are sure, you are right'),
+      down: (s?: string) => (s ? `you have been sure of wrong answers on ${s}` : 'you have been sure of wrong answers before') }
+  ]
+  const clear = parts.filter((x) => x.v * sign >= 0.075)
+  const named = (clear.length ? clear : [...parts].sort((a, b) => b.v * sign - a.v * sign).slice(0, 1))
+    .map((x) => (sign > 0 ? x.up : x.down)(subject(where(x.rates, x.better))))
+  const bar = requiredFor({ factor } as Track, 0)
+  const why = bar === 2
+    ? history < k ? 'not much history yet, so the standard bar' : 'the standard bar'
+    : `${bar < 2 ? 'a lower bar' : 'a higher bar'}: ${named.join('; ')}`
+  return {
+    relapse: rel.rate, pace: pc.rate, sureRight: sr.rate, factor,
+    n: { answers: pace.learner.n, cleared: retention.learner.n, sure: calib.learner.n, here: (scope.topic ? pace.topic.n : pace.skill.n) },
+    why
+  }
 }
 
 // ── The evidence since a mistake was last seen ──────────────────────────────
@@ -156,7 +214,7 @@ export function depthOf(d: MistakeDepth): number {
 
 /** The evidence this learner needs for this mistake: 2 by default; 1.25 (one strong lesson) … 4. */
 export function requiredFor(track: Track, depth: number): number {
-  const r = 2 - 1.25 * track.factor + 0.5 * depth
+  const r = 2 - 1.75 * track.factor + 0.5 * depth
   return Math.round(Math.min(4, Math.max(1.25, r)) * 4) / 4
 }
 

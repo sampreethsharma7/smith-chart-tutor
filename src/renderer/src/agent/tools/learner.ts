@@ -1,7 +1,7 @@
 import { applyEvidence, JUDGEMENT_CAP, overallLevel, setMastery, SKILLS, skillName, type Outcome, type SkillId } from '@shared/profile'
 import { skillStanding, standingForTutor } from '@shared/standing'
 import { forgetNote, inferTopic, learnerBrief, misconceptionSignOff, NOTE_CATEGORIES, saveNote, TOPIC_IDS, topicDef, type NoteCategory, type TopicId } from '@shared/memory'
-import { SIGNOFF_WORDS, trackOf, type Observation } from '@shared/signoff'
+import { SIGNOFF_WORDS, type Observation } from '@shared/signoff'
 import { addSlips, CONFUSION_IDS, CONFUSIONS, patternNews, patternsOf, type Confusion } from '@shared/patterns'
 import { defineTools, type ToolContext } from '../types'
 
@@ -161,7 +161,6 @@ export default defineTools([
         }
         const q: typeof p = { ...p, skills: { ...p.skills, [id]: next }, observations: [...(p.observations ?? []), ob].slice(-150) }
         // The misconceptions it bears on: does this evidence clear them? (Never in the lesson they appeared.)
-        const track = trackOf(p)
         return {
           ...q,
           misconceptions: q.misconceptions.map((m) => {
@@ -171,7 +170,7 @@ export default defineTools([
               signoff.push(`"${m.description}": doesn't count toward clearing it (same lesson it appeared in)`)
               return m
             }
-            const so = misconceptionSignOff(q, m, track)
+            const so = misconceptionSignOff(q, m, p)
             if (so.status === 'cleared' || so.status === 'confirmed') {
               signoff.push(`"${m.description}": cleared, provisionally (${so.why}); say so and check it again in a later lesson, don't call it fixed`)
               return { ...m, resolved: true, resolvedAt: now }

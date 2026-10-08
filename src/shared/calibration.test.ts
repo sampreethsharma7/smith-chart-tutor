@@ -40,7 +40,7 @@ describe('how sure they were changes what an answer proves', () => {
     // In the brief, the one they were sure of comes first and says so.
     const both = recordGraded(recordGraded(p, result({ outcome: 'incorrect', sure: 'unsure', misconception: 'Mixes up r and x', meta: { topic: 'read_z', skill: 'chart_basics', difficulty: 1 } })).profile, result({ outcome: 'incorrect', sure: 'sure', at: '2026-10-01T00:00:00.000Z' })).profile
     // ...with where it stands against its bar (sure of it: a higher bar than a slip, 2.25 vs 2).
-    expect(learnerBrief(both, AT).text).toMatch(/Live misconceptions: \[[^\]]+\] Sure of a wrong answer on which way a shunt L moves the point \([^)]*they were sure: undo this first\) still there, 0\/2\.25; \[[^\]]+\] Mixes up r and x \(read_z, 1×\) still there, 0\/2 \(their bar: not much history yet, so the standard bar\)/)
+    expect(learnerBrief(both, AT).text).toMatch(/Live misconceptions: \[[^\]]+\] Sure of a wrong answer on which way a shunt L moves the point \([^)]*they were sure: undo this first\) still there, 0\/2\.25; \[[^\]]+\] Mixes up r and x \(read_z, 1×\) still there, 0\/2$/m)
   })
 })
 

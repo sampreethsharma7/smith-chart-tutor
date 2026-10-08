@@ -6,7 +6,7 @@
  * bounded brief that is what the tutor actually reads when planning.
  */
 import { applyEvidence, lessonsOf, SKILLS, type Misconception, type Outcome, type Profile, type SkillId, type Sure } from './profile'
-import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOff, type Track } from './signoff'
+import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOff } from './signoff'
 
 // ── Topics: the specific things a learner can be good or shaky at ───────────
 
@@ -251,10 +251,13 @@ export function calibrationOf(p: Profile): Calibration {
 
 /**
  * Where a misconception stands (signoff.ts): the evidence on its topic since it was last seen, from
- * later lessons only, judged against what this learner needs for a mistake this deep.
+ * later lessons only, judged against what this learner needs for a mistake this deep, from their
+ * record on its topic and skill. recordFrom: the profile to judge the record from (the one before
+ * an answer being recorded, so an answer doesn't lower its own bar).
  */
-export function misconceptionSignOff(p: Profile, x: Misconception, track: Track = trackOf(p)): SignOff {
+export function misconceptionSignOff(p: Profile, x: Misconception, recordFrom: Profile = p): SignOff {
   const topic = inferTopic(x)
+  const track = trackOf(recordFrom, { topic, skill: x.skill })
   const last = x.sessions?.length ? x.sessions : [sessionAt(p, x.lastSeen)].filter((s): s is string => !!s)
   const evidence = gatherEvidence(p, {
     topics: topic ? [topic] : [], after: x.lastSeen, exclude: new Set(last),
@@ -288,10 +291,9 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
 
   if (outcome === 'correct') {
     const withAnswer: Profile = { ...p, topics: { ...(p.topics ?? {}), [m.topic]: topic } }
-    const track = trackOf(p)
     misconceptions = misconceptions.map((x) => {
       if (!onTopic(x)) return x
-      const so = misconceptionSignOff(withAnswer, x, track)
+      const so = misconceptionSignOff(withAnswer, x, p)
       const sameLesson = (x.sessions ?? []).includes(r.session) || (!x.sessions && sessionAt(p, x.lastSeen) === r.session)
       if (x.resolved) {
         if (so.status === 'confirmed' && !sameLesson) notes.push(`misconception confirmed gone: "${x.description}" (it held in a later lesson)`)
@@ -485,15 +487,16 @@ export function learnerBrief(p: Profile, now: string): BriefParts {
 
   const live = p.misconceptions.filter((m) => !m.resolved)
     .sort((a, b) => Number(!!b.confident) - Number(!!a.confident) || b.lastSeen.localeCompare(a.lastSeen) || b.count - a.count).slice(0, 4)
-  const track = trackOf(p)
   if (live.length) {
     lines.push(`Live misconceptions: ${live.map((m) => {
-      const so = misconceptionSignOff(p, m, track)
-      return `[${m.id}] ${m.description} (${inferTopic(m) ?? m.skill}, ${m.count}×${m.relapses ? `, back ${m.relapses}× after clearing` : ''}${m.confident ? ', they were sure: undo this first' : ''}) ${SIGNOFF_WORDS[so.status]}, ${so.points}/${so.required}`
-    }).join('; ')} (their bar: ${track.why})`)
+      const so = misconceptionSignOff(p, m)
+      // The bar's reason only when it isn't the standard one: it's per mistake (their record on its topic and skill).
+      const bar = /^a (lower|higher) bar/.test(so.why) ? ` (${so.why})` : ''
+      return `[${m.id}] ${m.description} (${inferTopic(m) ?? m.skill}, ${m.count}×${m.relapses ? `, back ${m.relapses}× after clearing` : ''}${m.confident ? ', they were sure: undo this first' : ''}) ${SIGNOFF_WORDS[so.status]}, ${so.points}/${so.required}${bar}`
+    }).join('; ')}`)
   }
   // Cleared, not yet confirmed: check each once more in a fresh situation.
-  const recheck = p.misconceptions.filter((m) => m.resolved && misconceptionSignOff(p, m, track).status === 'cleared').slice(0, 3)
+  const recheck = p.misconceptions.filter((m) => m.resolved && misconceptionSignOff(p, m).status === 'cleared').slice(0, 3)
   if (recheck.length) lines.push(`Cleared, to re-check in a later lesson (one clean answer in a new situation confirms it): ${recheck.map((m) => `[${m.id}] ${m.description}`).join('; ')}`)
   const cal = calibrationOf(p)
   if (cal.verdict !== 'unknown') {

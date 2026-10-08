@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createProfile, migrateProfile, type Misconception, type Profile } from './profile'
 import type { TopicStat } from './memory'
-import { gatherEvidence, lessonStrength, requiredFor, signOff, trackOf, type Evidence } from './signoff'
+import { gatherEvidence, lessonStrength, requiredFor, SHRINK_STRENGTH, signOff, trackOf, type Evidence } from './signoff'
 
 const AT = (d: number) => new Date(Date.UTC(2026, 8, 1) + d * 86_400_000).toISOString()
 const base = () => migrateProfile(createProfile('Sam'))
@@ -31,14 +31,15 @@ describe('the bar comes from the learner\'s own record', () => {
     expect(trackOf(base())).toMatchObject({ factor: 0, why: 'not much history yet, so the standard bar' })
     // Three answers, all wrong, and sure of one: not enough to judge them by.
     const shaky = withHistory({ seen: 3, correct: 0, sure: [1, 0] })
-    expect(trackOf(shaky).factor).toBe(0)
+    expect(Math.abs(trackOf(shaky).factor)).toBeLessThan(0.07)
     expect(requiredFor(trackOf(shaky), 0)).toBe(2)
+    expect(trackOf(shaky).why).toBe('not much history yet, so the standard bar')
   })
 
   it('a learner who picks things up quickly and keeps them gets a lower bar: one strong lesson', () => {
     const quick = withHistory({ seen: 80, correct: 76, sure: [20, 20], cleared: 8 })
     const t = trackOf(quick)
-    expect(t.factor).toBeGreaterThan(0.5)
+    expect(t.factor).toBeGreaterThan(0.4)
     expect(t.why).toMatch(/lower bar.*you usually keep what you learn.*you pick things up quickly/)
     const req = requiredFor(t, 0)
     expect(req).toBe(1.25)
@@ -118,5 +119,56 @@ describe('the evidence', () => {
     const two = [lesson('L2', 1), lesson('L3', 2)]
     expect(signOff(two, t, slip)).toMatchObject({ status: 'cleared', clearedIn: 'L3', needed: 'one clean answer in a later lesson to confirm it' })
     expect(signOff([...two, lesson('L4', 3)], t, slip).status).toBe('confirmed')
+  })
+})
+
+describe('the record is read where the mistake is: topic → skill → learner → default', () => {
+  /** Quick with admittance (right, and right when sure), slow with transmission lines. */
+  function mixed(): Profile {
+    const p = base()
+    const stat = (seen: number, correct: number): TopicStat => ({ seen, correct, recent: [], streak: 0, level: 2, box: 2, due: AT(0), lastSeen: AT(0), rightIn: [] })
+    const sure = (topic: 'plot_y' | 'read_y' | 'dir_line' | 'land_line', n: number, right: boolean) =>
+      Array.from({ length: n }, () => ({ sure: 'sure' as const, right, at: AT(0), topic }))
+    return {
+      ...p,
+      topics: { plot_y: stat(25, 24), read_y: stat(25, 24), dir_line: stat(25, 9), land_line: stat(25, 8) },
+      calibration: [...sure('plot_y', 10, true), ...sure('read_y', 10, true), ...sure('dir_line', 8, false), ...sure('land_line', 4, true)]
+    }
+  }
+
+  it('quick with admittance, slow with lines: a lower bar for an admittance mistake, a higher one for a lines mistake', () => {
+    const p = mixed()
+    const y = trackOf(p, { topic: 'read_y' })
+    const line = trackOf(p, { topic: 'dir_line' })
+    expect(requiredFor(y, 0)).toBeLessThan(2)
+    expect(requiredFor(line, 0)).toBeGreaterThan(2)
+    expect(y.why).toMatch(/^a lower bar: .*(reading y and Y|Admittance)/)
+    expect(line.why).toMatch(/^a higher bar: .*(which way a line turns the point|Transmission lines)/)
+    // Learner-wide, the two cancel out: the old single record would have given both the same bar.
+    expect(requiredFor(trackOf(p), 0)).toBe(2)
+  })
+
+  it('a topic they haven\'t tried follows its skill; a skill they haven\'t tried follows their overall record', () => {
+    const p = mixed()
+    expect(requiredFor(trackOf(p, { topic: 'wtg' }), 0)).toBeGreaterThan(2) // a lines topic, never tried
+    expect(trackOf(p, { topic: 'wtg' }).why).toMatch(/Transmission lines/)
+    expect(requiredFor(trackOf(p, { topic: 'stub_match' }), 0)).toBe(requiredFor(trackOf(p), 0)) // stubs: nothing yet
+  })
+
+  it('a topic\'s own record takes over as it grows, even against a strong skill', () => {
+    const p = mixed()
+    const shaky = (n: number): Profile => ({ ...p, topics: { ...p.topics, plot_y: { ...p.topics!.plot_y!, seen: n, correct: Math.round(n * 0.3) } } })
+    const bar = (q: Profile) => requiredFor(trackOf(q, { topic: 'plot_y' }), 0)
+    expect(bar(shaky(3))).toBeLessThanOrEqual(bar(shaky(30)))
+    expect(bar(shaky(60))).toBeGreaterThanOrEqual(2)
+    expect(trackOf(shaky(60), { topic: 'plot_y' }).why).toMatch(/you've needed a few tries on placing an admittance \(y\)/)
+  })
+
+  it('one strength tunes all of it: stronger shrinkage keeps the bar nearer the default for the same record', () => {
+    const p = mixed()
+    const at = (k: number) => Math.abs(trackOf(p, { topic: 'dir_line' }, k).factor)
+    expect(SHRINK_STRENGTH).toBe(15)
+    expect(at(5)).toBeGreaterThan(at(15))
+    expect(at(15)).toBeGreaterThan(at(60))
   })
 })

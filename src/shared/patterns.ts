@@ -269,12 +269,15 @@ const qualifies = (mine: Slip[]) =>
  */
 export function patternsOf(p: Profile): Pattern[] {
   const slips = p.slips ?? []
-  const track = trackOf(p)
   const out: Pattern[] = []
   for (const id of CONFUSION_IDS) {
     const mine = slips.filter((s) => s.confusion === id).sort((x, y) => x.at.localeCompare(y.at))
     if (!qualifies(mine)) continue
     const def = CONFUSIONS[id]
+    // Its bar comes from their record where it shows up: one topic, one skill, or (across skills) overall.
+    const seenTopics = [...new Set(mine.map((s) => s.topic).filter((t): t is TopicId => !!t))]
+    const skills = [...new Set(seenTopics.map((t) => topicDef(t)!.skill))]
+    const track = trackOf(p, seenTopics.length === 1 ? { topic: seenTopics[0] } : skills.length === 1 ? { skill: skills[0] } : {})
     const judge = (seen: Slip[], before?: string) => {
       const topics = new Set(seen.map((s) => s.topic).filter((t): t is TopicId => !!t))
       const lastSeen = seen[seen.length - 1].at

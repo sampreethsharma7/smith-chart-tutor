@@ -6,7 +6,7 @@ import { startLesson } from '@/state/journey'
 import { OutcomeBadge } from '@/components/LessonWrapUp'
 import { forgetNote, misconceptionSignOff, topicDef } from '@shared/memory'
 import { isLive, patternsOf, type Pattern } from '@shared/patterns'
-import { SIGNOFF_WORDS, trackOf, type SignOffStatus } from '@shared/signoff'
+import { SIGNOFF_WORDS, type SignOffStatus } from '@shared/signoff'
 import { Standing } from '@/components/Standing'
 
 export function ProgressView() {
@@ -15,8 +15,7 @@ export function ProgressView() {
   const sessions = [...lessonsOf(profile)].reverse()
   const open = profile.misconceptions.filter((m) => !m.resolved)
   const resolved = profile.misconceptions.filter((m) => m.resolved)
-  const track = trackOf(profile)
-  const recheck = resolved.filter((m) => misconceptionSignOff(profile, m, track).status === 'cleared').length
+  const recheck = resolved.filter((m) => misconceptionSignOff(profile, m).status === 'cleared').length
   const exercises = profile.sessions.flatMap((s) => s.exercises)
 
   return (
@@ -42,7 +41,7 @@ export function ProgressView() {
           {open.length === 0 && <div className="muted small">None open.</div>}
           <ul className="plain">
             {open.map((m) => {
-              const so = misconceptionSignOff(profile, m, track)
+              const so = misconceptionSignOff(profile, m)
               return (
               <li key={m.id}>
                 <b>{skillName(m.skill)}</b> · seen {m.count}×{m.relapses ? ` · came back ${m.relapses}×` : ''}{' '}
