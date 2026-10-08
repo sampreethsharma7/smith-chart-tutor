@@ -133,6 +133,23 @@ if (app.isPackaged) for (const k of Object.keys(process.env)) if (k.startsWith('
 // Dev aid: run against a throwaway data folder.
 if (process.env.SMITH_USERDATA) app.setPath('userData', process.env.SMITH_USERDATA)
 
+// One window per data folder. A second launch (the start file double-clicked twice, or another copy of
+// the app on this PC) would otherwise save the same profile files and overwrite the other's progress:
+// it brings the open window to the front instead. (The lock lives in the data folder, so a throwaway
+// SMITH_USERDATA folder gets its own.)
+const headless = !!(process.env.SMITH_BENCH || process.env.SMITH_LIST_MODELS || process.env.SMITH_PROBE)
+if (!headless && !app.requestSingleInstanceLock()) {
+  console.log('Smith Chart Tutor is already open: switching to that window.')
+  app.exit(0)
+} else {
+  app.on('second-instance', () => {
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  })
+}
+
 /**
  * Headless benchmark: SMITH_BENCH=all (or comma-separated provider ids/labels)
  * runs the suite for configured models, saves results like the UI does, prints
