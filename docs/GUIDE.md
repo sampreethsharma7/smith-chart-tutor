@@ -287,7 +287,7 @@ The app keeps it, so it's the same whichever model teaches, and it stays small h
   - notes and the last few lessons
   - how long this lesson has been going (this sitting, if it was picked up again after a break)
 
-  It's also told to read your energy: if replies turn short or frustrated, it backs off (a smaller step, a worked example, or an offer to wrap up), and past about 45 minutes it offers to finish with a recap instead of starting something big.
+  It's also told to read your energy: if replies turn short or frustrated, it backs off (a smaller step, a worked example, or an offer to wrap up).
 
   The tutor picks the area (reviews and misconceptions first, then weak topics, then the lesson goal), pitches at the aim level and varies the form. Transcripts are kept for you to read, but the tutor no longer reads old ones.
 - **Progress** shows each skill's topics: how often you got them right, the next aim level, and whether a review is due.
