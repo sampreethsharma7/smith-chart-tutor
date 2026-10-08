@@ -17,3 +17,6 @@ Thumbs.db
 .env.*
 keys.json
 settings.json
+
+# The one-click start's private Node.js and npm cache
+.runtime/

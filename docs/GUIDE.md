@@ -17,9 +17,13 @@ A desktop Smith chart with an agentic AI tutor. The chart shows every metric (Z,
 
 ## Run
 
+Most people should use the one-click start: extract the ZIP and double-click `Start-Windows.cmd`, `Start-Mac.command` or `Start-Linux.sh` (see the [README](../README.md#getting-started)). It needs no admin rights: a private Node.js goes into `.runtime/` in the app folder, then [scripts/launch.mjs](../scripts/launch.mjs) installs, builds and starts the app, redoing a step only when its inputs changed. `--no-launch` stops before starting the app.
+
+For development:
+
 ```bash
 npm install
-npm run dev        # development, hot reload (or double-click start.cmd)
+npm run dev        # development, hot reload
 npm run build && npm start
 npm test           # RF engine, importers, solver, assessment key, tool-arg coercion
 ```

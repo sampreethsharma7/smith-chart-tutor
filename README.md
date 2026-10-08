@@ -156,7 +156,52 @@ The memory lives in the app, not the model, so it's the same whichever model tea
 
 ## Getting started
 
-**You need:** [Node.js](https://nodejs.org) 20 or newer, and an API key for at least one provider, or a local model in [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai).
+**No admin rights, no installers, nothing to set up first.** This works on locked-down work and university laptops.
+
+1. **Download** the ZIP (green **Code** button → **Download ZIP**) and **extract** it somewhere in your user folder, for example `Documents\SmithChartTutor`.
+2. **Double-click the start file for your system:**
+
+   | Windows 10 / 11 | macOS | Linux |
+   |---|---|---|
+   | `Start-Windows.cmd` | `Start-Mac.command` | `Start-Linux.sh` |
+
+That's all. The first run takes a few minutes. It downloads a private copy of Node.js (checked against its official checksum), installs the app's components and builds the app, all **inside that folder**. After that, a double-click starts the app in seconds.
+
+You'll also need an API key for at least one AI provider, or a free local model in [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai). The app asks for it in the Models tab and links to where to get one.
+
+<details>
+<summary><b>First time on macOS or Windows: the "can't be opened" / "protected your PC" warning</b></summary>
+
+Files downloaded from the internet get one extra check the first time:
+
+- **macOS:** if it says the file can't be opened, **right-click** `Start-Mac.command` → **Open** → **Open**. If it says you don't have permission, open Terminal and run `bash ` followed by a space, then drag the file into the Terminal window and press Enter.
+- **Windows:** if SmartScreen says "Windows protected your PC", click **More info** → **Run anyway**.
+
+</details>
+
+<details>
+<summary><b>On a company network, behind a proxy, or something went wrong?</b></summary>
+
+- The first run downloads from `nodejs.org`, `registry.npmjs.org` and `github.com`, about 150 MB, and uses about 600 MB of disk.
+- Your company's HTTPS certificates are trusted automatically, the same way your browser trusts them.
+- **Behind a proxy:** set `HTTPS_PROXY` (for example `http://proxy.company.com:8080`) before starting, or ask IT to allow those three sites.
+- **Something stopped halfway:** just double-click the start file again. It carries on where it stopped. If that doesn't help, delete the hidden `.runtime` folder and try again.
+- **Avoid synced folders:** the app works best outside OneDrive or Dropbox folders, which slow down installs with many small files.
+
+</details>
+
+**Updating:** download the new ZIP, extract it, and start it the same way. Your profiles, progress and keys are kept separately in your user data folder, so they carry over. **Uninstalling:** delete the folder. To remove your data too, use **Profiles → Open data folder** first.
+
+**In the app:**
+
+1. **Profiles:** set your name, experience, goals and tutor style.
+2. **Placement test** (optional): 21 exactly graded questions that set your starting level for each skill.
+3. **Models:** add a connection, paste its key, tick the models you want, and run the benchmark if you like.
+4. **Learn → ▶ Start lesson:** take the tutor's pick, choose a skill, bring your own question, or **Check yourself**.
+
+### For developers
+
+With [Node.js](https://nodejs.org) 20 or newer installed:
 
 ```bash
 git clone https://github.com/sampreethsharma7/smith-chart-tutor.git
@@ -165,18 +210,9 @@ npm install
 npm run dev
 ```
 
-On Windows you can also double-click **`start.cmd`**. It installs the dependencies on first run.
-
-Then:
-
-1. **Profiles:** set your name, experience, goals and tutor style.
-2. **Placement test** (optional): 21 exactly graded questions that set your starting level for each skill.
-3. **Models:** add a connection, paste its key, tick the models you want, and run the benchmark if you like.
-4. **Learn → ▶ Start lesson:** take the tutor's pick, choose a skill, bring your own question, or **Check yourself**.
-
 > **Running from a VS Code terminal?** VS Code sets `ELECTRON_RUN_AS_NODE=1`, which makes Electron start as plain Node. Unset it first: `unset ELECTRON_RUN_AS_NODE` in bash, or `$env:ELECTRON_RUN_AS_NODE=$null` in PowerShell.
 
-### Commands
+Commands:
 
 ```bash
 npm run dev         # development, with hot reload
