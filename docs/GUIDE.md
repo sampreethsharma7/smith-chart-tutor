@@ -273,9 +273,8 @@ The app keeps it, so it's the same whichever model teaches, and it stays small h
 - **Misconceptions are tied to topics.** A wrong pick on a move question records exactly which wrong idea it shows. A misconception clears by itself through the adaptive sign-off, and reopens if you slip again. Older ones get their topic from their wording.
 - **Adaptive sign-off** ([signoff.ts](../src/shared/signoff.ts)): when is a mistake really fixed?
   - **Evidence** comes only from lessons after the one it appeared in. Each such lesson counts once: 1 for a right graded answer, plus ¼ each if they were sure, gave the right reason, or did it in a new situation, at most 1.5. The tutor's own observations (`record_evidence`, which must say the `reason` and whether it was `transfer`) count half.
-  - **The bar** is 2 by default, about two lessons. It moves with the learner's record: retention (how often cleared mistakes came back), pace (share of graded answers right) and calibration (right when sure). It ranges from 1.25 (one strong lesson, for someone whose fixes stick) up to 4.
-  - **The record is read where the mistake is:** the topic's record is pulled toward the skill's, the skill's toward the learner's, and the learner's toward the default, each with the same strength (`SHRINK_STRENGTH`, 15 answers' worth; the one setting to tune). The whole adjustment is also weighed by how much history there is, with that same strength. So someone quick with admittance but slow with lines gets a lower bar for an admittance mistake and a higher one for a lines mistake. A topic they haven't tried follows its skill, a skill they haven't tried follows their overall record, and a new learner gets the standard bar. The topic → skill mapping is the `TOPICS` table in [memory.ts](../src/shared/memory.ts). A pattern uses its topic or skill when it stays within one, and the learner's overall record when it crosses skills.
-  - **The reason shown** names the most specific place behind it ("you've needed a few tries on which way a line turns the point").
+  - **The bar** is `SIGNOFF.defaultBar` (2, about two lessons) by default. It moves with the learner's record: retention (how often cleared mistakes came back), pace (share of graded answers right) and calibration (right when sure). Each is pulled toward the default with one strength (`SIGNOFF.strength`, 15 answers' worth), and the whole adjustment is weighed by how much history there is with that same strength, so a new learner gets the standard bar. It ranges from 1.25 (one strong lesson, for someone whose fixes stick) up to 4.
+  - **Learner-wide, on purpose.** One learner rarely has enough answers on a single topic to judge it: after 10 lessons, typically 1–4 per topic. Every graded answer is kept with its topic and skill (`Profile.answers`, the last 1,000), so per-topic records can be added once there's data for them.
   - **Deeper mistakes need more:** seen many times or over several lessons, sure of it, or back after being cleared. The deepest also need one lesson in a new situation.
   - **Cleared is provisional:** one clean lesson later confirms it. The tutor speaks in these words (looking better, cleared, confirmed) and can't declare a mistake fixed: `resolve_misconception` only removes one recorded by mistake.
 - **Notes are few and categorised:** goal, preference, what clicked, struggle, other. At most 5 are kept per category. A near-duplicate replaces the older note; the tutor can update or delete notes, and so can you, on Progress.
@@ -286,11 +285,14 @@ The app keeps it, so it's the same whichever model teaches, and it stays small h
   - live misconceptions
   - the last items asked, so they aren't repeated
   - notes and the last few lessons
+  - how long this lesson has been going (this sitting, if it was picked up again after a break)
+
+  It's also told to read your energy: if replies turn short or frustrated, it backs off (a smaller step, a worked example, or an offer to wrap up), and past about 45 minutes it offers to finish with a recap instead of starting something big.
 
   The tutor picks the area (reviews and misconceptions first, then weak topics, then the lesson goal), pitches at the aim level and varies the form. Transcripts are kept for you to read, but the tutor no longer reads old ones.
 - **Progress** shows each skill's topics: how often you got them right, the next aim level, and whether a review is due.
 
-**Export** saves the whole profile (history included, API keys never) to a file for backup or moving to another PC; **Import** brings it back.
+**Export** saves the whole profile (history included, API keys never) to a file for backup or moving to another PC; **Import** brings it back. **Reset progress** starts over with the same name, background and preferences: lessons, answers, skills, mistakes, the tutor's notes and the plan are cleared (export first to keep a copy).
 
 ### What is saved, and when
 

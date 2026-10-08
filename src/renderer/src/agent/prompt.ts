@@ -20,6 +20,7 @@ const STABLE = `You are a personal Smith-chart tutor inside a desktop app. Your 
 - Predict → act → verify. Before the learner changes something, ask them to predict what will happen (ask_move or ask_locate, which the app grades; ask_prediction for open-ended ones), then let them try it on the chart and compare. Discuss the gap.
 - Talk to the learner directly ("you"), never about them, and never narrate your own plan ("Let's engage them…").
 - Ask one focused question at a time. Keep messages short (usually under 120 words). No walls of text.
+- Read their energy. If replies turn short or flat ("ok", "idk", "?", one word) or frustrated ("this makes no sense", "just tell me"), back off: a shorter message, one small step or a worked example, and a quick check-in ("want an easier one, a worked example, or to wrap up here?"). Don't push a new topic or a hard question then. Lessons tire people: past about 45 minutes (see Lesson time), offer to wrap up with a recap rather than starting something big.
 - Do not hand out answers. Escalate help gradually: guiding question → pointer on the chart (annotate_chart) → partial hint → worked step. Give a full solution only if they have genuinely tried and explicitly ask, and then make them explain it back.
 - Tie ideas to geometry on the chart: "series elements move along constant-r circles", "a line rotates around the centre", "the distance from the centre is |Γ|".
 - Connect to their real goal (antenna design, matching, CST results) whenever you can.
@@ -101,6 +102,19 @@ function coordinatesLine(plan: NonNullable<SessionRecord['plan']>): string {
   return `Coordinates for the current step: ${c.toUpperCase()} (${how}). Call set_lesson_coordinates if you switch.${inferred}`
 }
 
+/** How long the lesson has been going: from its start, or from the first message after a break of over 2 hours. */
+export function lessonTime(session: SessionRecord | null | undefined, now: string): string {
+  if (!session?.startedAt) return ''
+  const t = session.transcript ?? []
+  // Resumed after a long gap (over 2 hours): time this sitting, not the whole lesson.
+  let start = session.startedAt
+  for (let i = 1; i < t.length; i++) if (new Date(t[i].at).getTime() - new Date(t[i - 1].at).getTime() > 2 * 3_600_000) start = t[i].at
+  const ms = new Date(now).getTime() - new Date(start).getTime()
+  if (!Number.isFinite(ms)) return ''
+  const min = Math.max(0, Math.round(ms / 60_000))
+  return `Lesson time: ${min} min${start !== session.startedAt ? ' (this sitting; resumed after a break)' : ''}.\n`
+}
+
 export function buildSystemPrompt(profile: Profile, session?: SessionRecord | null): SystemPrompt {
   const plan = session?.plan
   const models = session?.models ?? []
@@ -121,7 +135,7 @@ Your plan for what's next (set_next_focus; shown on their Progress page and less
 ${lessonsOf(profile).length ? '' : 'This is their first lesson with you.'}
 
 ## This lesson (structured state; it carries over if the tutor model changes)
-${plan
+${lessonTime(session, now)}${plan
   ? `Goal: ${plan.goal}\n${plan.steps.map((s, i) => `${i < plan.step ? '[done]' : i === plan.step ? '[current]' : '[ ]'} ${i + 1}. ${s}`).join('\n')}${plan.step >= plan.steps.length ? '\nAll steps done: if the goal is reached, call complete_lesson.' : ''}
 ${coordinatesLine(plan)}`
   : 'No goal set yet: call set_lesson_goal once you know what this lesson is for.'}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createProfile, migrateProfile, type Profile } from './profile'
+import { ANSWER_LOG_MAX, createProfile, exportProfile, migrateProfile, resetProgress, type Profile } from './profile'
 import {
   aimFor, classifyLocate, classifyMatch, classifyMove, classifyReach, classifyValue, forgetNote, learnerBrief, misconceptionSignOff,
   inferTopic, noteAsked, NOTES_PER_CATEGORY, recordGraded, REVIEW_DAYS, saveNote, startLevel, topicDef, type GradedMeta, type TopicId
@@ -121,6 +121,17 @@ describe('recording a graded answer', () => {
     expect(misconceptionSignOff(slip.profile, slip.profile.misconceptions[0]).required).toBeGreaterThan(2)
   })
 
+  it('keeps every graded answer as it happened, with its topic and skill (bounded), for measures added later', () => {
+    let p = learner()
+    const m = classifyMove('shuntC', 'path')
+    p = recordGraded(p, { meta: { ...m, ctx: 'upper half' }, outcome: 'correct', label: 'q', session: 's1', at: at(0), sure: 'guess', format: 'mcq', helped: true }).profile
+    // Recorded raw: right, though it counted as partly right (a guess, with help).
+    expect(p.answers).toEqual([{ at: at(0), session: 's1', topic: 'dir_shuntC', skill: 'lumped_moves', difficulty: m.difficulty, outcome: 'correct', sure: 'guess', helped: true, format: 'mcq', ctx: 'upper half' }])
+    for (let i = 0; i < ANSWER_LOG_MAX + 5; i++) p = answer(p, m, i % 2 === 0, `s${i}`, at(1 + i / 100)).profile
+    expect(p.answers).toHaveLength(ANSWER_LOG_MAX)
+    expect(p.answers!.at(-1)!.session).toBe(`s${ANSWER_LOG_MAX + 4}`)
+  })
+
   it('a misconception the tutor logged against a topic is closed the same way', () => {
     let p = learner()
     p = { ...p, misconceptions: [{ id: 'mc1', skill: 'reflection', topic: 'gamma_vswr', description: 'Confuses Γ with VSWR', count: 1, firstSeen: at(0), lastSeen: at(0), resolved: false }] }
@@ -231,5 +242,44 @@ describe('older misconceptions without a topic', () => {
     const p = migrateProfile({ ...createProfile('Old'), tutorNotes: [long], notes: undefined } as Profile)
     expect(p.notes![0].text.endsWith('…')).toBe(true)
     expect(p.notes![0].text.length).toBeLessThanOrEqual(240)
+  })
+})
+
+describe('export and reset', () => {
+  /** A learner with some history: lessons' answers, a mistake, a note, a plan. */
+  function withHistory(): Profile {
+    let p = learner('intermediate')
+    p = { ...p, setupComplete: true, preferences: { ...p.preferences, tutorStyle: 'balanced' }, background: { ...p.background, goals: 'Match my patch antenna' } }
+    const m = classifyMove('shuntC', 'path')
+    p = answer(p, m, false, 's1', at(0), 'Thinks a shunt C turns counter-clockwise').profile
+    p = answer(p, m, true, 's2', at(2)).profile
+    p = saveNote(p, { category: 'goal', text: 'Match a 2.4 GHz patch' }, at(2)).profile
+    return {
+      ...p,
+      sessions: [{ id: 's1', startedAt: at(0), transcript: [], exercises: [] }],
+      observations: [{ at: at(2), session: 's2', skill: 'lumped_moves', topic: 'dir_shuntC', outcome: 'correct', reason: 'right', transfer: true }],
+      nextFocus: { picks: [{ skill: 'lumped_moves', why: 'x' }], at: at(2) }
+    }
+  }
+
+  it('an exported profile imports with everything, including the answer log and the tutor\'s observations', () => {
+    const p = withHistory()
+    const back = migrateProfile(JSON.parse(JSON.stringify(exportProfile(p))))
+    expect(back.answers).toEqual(p.answers)
+    expect(back.observations).toEqual(p.observations)
+    expect(back.misconceptions).toEqual(p.misconceptions)
+    expect(back.topics).toEqual(p.topics)
+  })
+
+  it('reset clears what the app learned and keeps who they are and how they like to learn', () => {
+    const p = withHistory()
+    const r = resetProgress(p)
+    expect(r).toMatchObject({ id: p.id, name: p.name, createdAt: p.createdAt, background: p.background, preferences: p.preferences, setupComplete: true })
+    expect(r.skills).toEqual(createProfile('x', { experience: 'intermediate' }).skills) // back to their stated experience
+    for (const k of ['sessions', 'misconceptions'] as const) expect(r[k]).toEqual([])
+    for (const k of ['topics', 'answers', 'observations', 'calibration', 'slips', 'notes', 'nextFocus', 'assessment', 'asked'] as const) expect(r[k]).toBeUndefined()
+    const brief = learnerBrief(r, at(3)).text
+    expect(brief).not.toMatch(/shunt C|2\.4 GHz/) // the mistake and the tutor's note are gone
+    expect(brief).toMatch(/Goals: Match my patch antenna/) // their own goal stays
   })
 })

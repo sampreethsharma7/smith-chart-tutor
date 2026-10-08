@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { createProfile, exportProfile, lessonsOf, migrateProfile, overallLevel, type Profile } from '@shared/profile'
+import { createProfile, exportProfile, lessonsOf, migrateProfile, overallLevel, resetProgress, type Profile } from '@shared/profile'
 import { api, useApp } from '@/state/app'
-import { useTutor } from '@/agent/tutor'
+import { flushConversation, useTutor } from '@/agent/tutor'
+import { useStudio } from '@/state/studio'
 
 type Draft = Pick<Profile, 'name' | 'background' | 'preferences'>
 
@@ -23,6 +24,22 @@ export function ProfilesView() {
   const busy = useTutor((t) => t.busy)
 
   const switchTo = (id: string) => selectProfile(id)
+
+  /** Start over with the same name, background and preferences (Export first to keep a copy). */
+  const doReset = async (p: Profile) => {
+    const ask = `Reset ${p.name}'s progress?\n\nLessons, answers, skills, mistakes, the tutor's notes and the plan are cleared, and a lesson in progress ends. ` +
+      `Name, background and preferences are kept.\n\nThis can't be undone: use Export first if you might want it back.`
+    if (!window.confirm(ask)) return
+    await useApp.getState().updateProfileById(p.id, resetProgress)
+    if (p.id === active?.id) {
+      useStudio.getState().setExercise(null)
+      useTutor.getState().reset()
+      await flushConversation()
+    } else {
+      await api().conversation.save(p.id, null)
+    }
+    setMsg(`${p.name}'s progress was reset.`)
+  }
 
   const saveDraft = async () => {
     if (!editing || !editing.draft.name.trim()) return
@@ -107,6 +124,7 @@ export function ProfilesView() {
                 <button onClick={() => setEditing({ id: p.id, draft: { name: p.name, background: p.background, preferences: p.preferences } })}>Edit</button>
                 {!p.assessment && p.id === active?.id && <button className="primary" onClick={() => setView('assessment')}>Take placement test</button>}
                 <button onClick={() => doExport(p)} title="Everything, including history: backup or move to another PC">Export</button>
+                <button disabled={busy} title={busy ? 'Wait for the tutor to finish' : 'Start over with the same name and settings'} onClick={() => doReset(p)}>Reset progress</button>
                 <button
                   className="danger"
                   disabled={busy}

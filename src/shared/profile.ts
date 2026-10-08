@@ -194,6 +194,12 @@ export interface Profile {
   calibration?: Array<{ sure: Sure; right: boolean; at: string; topic?: TopicId }>
   /** The tutor's structured observations of what the app can't grade: the reason they gave, and transfer (signoff.ts) */
   observations?: Observation[]
+  /**
+   * Every graded answer, newest last (the last ANSWER_LOG_MAX): what, where and how it went. The
+   * learner model works from summaries; this keeps the raw history so new measures (e.g. a
+   * per-topic record for sign-off) can be built from real data later.
+   */
+  answers?: AnswerRecord[]
   /** Scoring version the skills were last brought up to (see rescore) */
   scoring?: number
   /**
@@ -238,6 +244,16 @@ export function createProfile(name: string, background: Partial<Profile['backgro
     sessions: [],
     tutorNotes: []
   }
+}
+
+/**
+ * Start over: everything the app has learned about them goes (skills back to their stated
+ * experience, lessons, answers, mistakes, the tutor's notes, the plan, the placement test). Who
+ * they are and how they like to learn stay: the profile's id, name, background and preferences.
+ */
+export function resetProgress(p: Profile): Profile {
+  const fresh = createProfile(p.name, p.background)
+  return { ...fresh, id: p.id, createdAt: p.createdAt, preferences: p.preferences, setupComplete: p.setupComplete }
 }
 
 /** Fill in any fields missing from older/imported profiles. */
@@ -296,6 +312,23 @@ function migrateNotes(p: Profile): Pick<Profile, 'tutorNotes' | 'notes'> {
 }
 
 export type Outcome = 'correct' | 'partial' | 'incorrect'
+
+/** One graded answer, as it happened (before any adjustment for help or guessing). */
+export interface AnswerRecord {
+  at: string
+  session: string
+  topic: TopicId
+  skill: SkillId
+  difficulty: number
+  outcome: Outcome
+  sure?: Sure
+  helped?: boolean
+  format?: string
+  /** The situation it was in (e.g. upper half, r < 1) */
+  ctx?: string
+}
+
+export const ANSWER_LOG_MAX = 1000
 
 /** How sure the learner said they were of an answer, before seeing the result. */
 export type Sure = 'sure' | 'unsure' | 'guess'

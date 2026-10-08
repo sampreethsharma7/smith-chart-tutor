@@ -5,7 +5,7 @@
  * per-topic statistics instead of raw answers, a few categorised notes, and a
  * bounded brief that is what the tutor actually reads when planning.
  */
-import { applyEvidence, lessonsOf, SKILLS, type Misconception, type Outcome, type Profile, type SkillId, type Sure } from './profile'
+import { ANSWER_LOG_MAX, applyEvidence, lessonsOf, SKILLS, type Misconception, type Outcome, type Profile, type SkillId, type Sure } from './profile'
 import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOff } from './signoff'
 
 // ── Topics: the specific things a learner can be good or shaky at ───────────
@@ -251,13 +251,13 @@ export function calibrationOf(p: Profile): Calibration {
 
 /**
  * Where a misconception stands (signoff.ts): the evidence on its topic since it was last seen, from
- * later lessons only, judged against what this learner needs for a mistake this deep, from their
- * record on its topic and skill. recordFrom: the profile to judge the record from (the one before
- * an answer being recorded, so an answer doesn't lower its own bar).
+ * later lessons only, judged against what this learner needs for a mistake this deep. recordFrom:
+ * the profile to judge their record from (the one before an answer being recorded, so an answer
+ * doesn't lower its own bar).
  */
 export function misconceptionSignOff(p: Profile, x: Misconception, recordFrom: Profile = p): SignOff {
   const topic = inferTopic(x)
-  const track = trackOf(recordFrom, { topic, skill: x.skill })
+  const track = trackOf(recordFrom)
   const last = x.sessions?.length ? x.sessions : [sessionAt(p, x.lastSeen)].filter((s): s is string => !!s)
   const evidence = gatherEvidence(p, {
     topics: topic ? [topic] : [], after: x.lastSeen, exclude: new Set(last),
@@ -350,7 +350,11 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
     skills: { ...p.skills, [m.skill]: skill },
     topics: { ...(p.topics ?? {}), [m.topic]: topic },
     misconceptions,
-    ...(r.sure ? { calibration: [...(p.calibration ?? []), { sure: r.sure, right: r.outcome === 'correct', at, topic: m.topic }].slice(-80) } : {})
+    ...(r.sure ? { calibration: [...(p.calibration ?? []), { sure: r.sure, right: r.outcome === 'correct', at, topic: m.topic }].slice(-80) } : {}),
+    answers: [...(p.answers ?? []), {
+      at, session: r.session, topic: m.topic, skill: m.skill, difficulty: m.difficulty, outcome: r.outcome,
+      ...(r.sure ? { sure: r.sure } : {}), ...(r.helped ? { helped: true } : {}), ...(r.format ? { format: r.format } : {}), ...(m.ctx ? { ctx: m.ctx } : {})
+    }].slice(-ANSWER_LOG_MAX)
   }
   const name = topicDef(m.topic)!.name
   const levelMove = topic.level > (p.topics?.[m.topic]?.level ?? startLevel(p, m.topic)) ? ' (up)' : topic.level < (p.topics?.[m.topic]?.level ?? startLevel(p, m.topic)) ? ' (down)' : ''
@@ -490,7 +494,7 @@ export function learnerBrief(p: Profile, now: string): BriefParts {
   if (live.length) {
     lines.push(`Live misconceptions: ${live.map((m) => {
       const so = misconceptionSignOff(p, m)
-      // The bar's reason only when it isn't the standard one: it's per mistake (their record on its topic and skill).
+      // The bar's reason only when it isn't the standard one.
       const bar = /^a (lower|higher) bar/.test(so.why) ? ` (${so.why})` : ''
       return `[${m.id}] ${m.description} (${inferTopic(m) ?? m.skill}, ${m.count}×${m.relapses ? `, back ${m.relapses}× after clearing` : ''}${m.confident ? ', they were sure: undo this first' : ''}) ${SIGNOFF_WORDS[so.status]}, ${so.points}/${so.required}${bar}`
     }).join('; ')}`)

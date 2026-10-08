@@ -770,7 +770,7 @@ async function loadConversation(profileId: string) {
     session: c.session ? migrateLessonState(c.session) : c.session,
     sessionStartedAt: c.sessionStartedAt,
     learnerTurns: c.learnerTurns,
-    usage: c.usage,
+    usage: c.usage ?? { input: 0, output: 0 },
     lastSeenEventAt: Date.now()
   })
 }
