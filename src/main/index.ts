@@ -73,9 +73,10 @@ function registerIpc() {
       if (!e.sender.isDestroyed()) e.sender.send('llm:event', requestId, ev)
     }
     if (!cfg) {
-      send({ type: 'error', message: 'No model selected. Add one under Models.' })
+      send({ type: 'error', message: 'No model selected. Add one under Models (the free local tutor needs no key).' })
       return final
     }
+    await ollama.ensureOllama(cfg.baseUrl)
     await runChat(cfg, await store.getKey(cfg.connectionId ?? cfg.id), req, requestId, send)
     return final
   })
@@ -83,6 +84,7 @@ function registerIpc() {
   ipcMain.handle('llm:models', async (_e, connectionId: string) => {
     const c = await store.getConnection(connectionId)
     if (!c) throw new Error('Unknown connection')
+    await ollama.ensureOllama(c.baseUrl)
     return listModels({ id: c.id, label: c.label, kind: c.kind, baseUrl: c.baseUrl, model: '' }, await store.getKey(c.id))
   })
 
@@ -132,6 +134,8 @@ function registerIpc() {
   const setups = new Map<string, AbortController>()
   ipcMain.handle('local:probe', async () => ({ machine: await ollama.probeMachine(), status: await ollama.ollamaStatus() }))
   ipcMain.handle('local:setup', async (e, id: string, model: string): Promise<SetupResult> => {
+    // One at a time: two would download into the same place.
+    if (setups.size) return { ok: false, error: 'A setup is already running. Wait for it to finish, or cancel it first.' }
     const ac = new AbortController()
     setups.set(id, ac)
     const progress = (p: SetupProgress) => { if (!e.sender.isDestroyed()) e.sender.send('local:progress', id, p) }
@@ -150,12 +154,21 @@ function registerIpc() {
       progress({ step: 'speed', text: `Checking how ${model} runs on this computer…` })
       return { ok: true, speed: await ollama.speedTest(model, ac.signal), apiBase: st.apiBase }
     } catch (err) {
-      return { ok: false, error: ac.signal.aborted ? 'Cancelled.' : (err as Error).message }
+      return { ok: false, error: ac.signal.aborted ? 'Cancelled. Start again any time: finished downloads are kept.' : plainError(err as Error) }
     } finally {
       setups.delete(id)
     }
   })
   ipcMain.handle('local:cancel', (_e, id: string) => setups.get(id)?.abort())
+}
+
+/** Setup errors a learner can act on. */
+function plainError(e: Error): string {
+  const m = e.message || String(e)
+  if (/newer version|requires a newer|412/i.test(m)) return 'This model needs a newer Ollama than the one on this computer. Update Ollama from ollama.com/download (or uninstall it, and the app sets up its own copy), then try again.'
+  if (/timeout|timed out/i.test(m)) return 'Ollama took too long to answer. If the computer was busy, try again; otherwise choose the smaller model.'
+  if (/ENOTFOUND|ECONNRESET|ERR_INTERNET|ERR_NAME|ERR_CONNECTION|ERR_PROXY|ERR_TUNNEL|net::/i.test(m)) return `The download was interrupted (${m}). Check the internet connection and try again: finished downloads are kept. On a company network, a proxy or firewall may block github.com or ollama.com.`
+  return m
 }
 
 /** With an Ollama connection set up, make sure Ollama is running (it isn't a background service when the app installed it). */

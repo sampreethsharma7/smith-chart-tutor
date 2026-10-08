@@ -6,7 +6,7 @@ import { journeySteps, lessonNumber, startLesson, type StepId } from '@/state/jo
 const HINT: Record<StepId, string> = {
   profile: 'Tell the tutor a little about you, then save.',
   test: 'About 10 minutes. Sets your starting level so lessons are pitched right.',
-  model: 'Paste an API key for a provider (or run Ollama locally), then pick the tutor model.',
+  model: 'Set up the free local tutor in one click, or paste an API key for a cloud model (Claude, Gemini, GPT).',
   lesson: 'Everything is ready.'
 }
 

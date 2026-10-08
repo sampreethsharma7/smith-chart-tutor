@@ -16,7 +16,7 @@ import { cpus, homedir, totalmem } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { createZstdDecompress } from 'node:zlib'
-import type { MachineInfo, OllamaStatus, SetupProgress, SpeedResult } from '@shared/localModels'
+import { LOCAL_MODELS, type MachineInfo, type OllamaStatus, type SetupProgress, type SpeedResult } from '@shared/localModels'
 
 // Dev aids: a second Ollama on another port and folder, so the install can be tested beside a real one.
 const PORT = Number(process.env.SMITH_OLLAMA_PORT) || 11434
@@ -248,6 +248,24 @@ export async function startOllama(binary: string): Promise<void> {
 }
 
 /**
+ * Before talking to a local Ollama at this app's address, make sure it runs: start it if it's
+ * installed but stopped (closed from its tray, or never started since the computer booted).
+ */
+export async function ensureOllama(baseUrl: string | undefined): Promise<void> {
+  if (!baseUrl) return
+  let u: URL
+  try {
+    u = new URL(baseUrl)
+  } catch {
+    return
+  }
+  if (!['localhost', '127.0.0.1'].includes(u.hostname) || Number(u.port || 80) !== PORT) return
+  if (await isUp()) return
+  const binary = await locateBinary()
+  if (binary) await startOllama(binary).catch(() => {}) // if it can't start, the request reports it
+}
+
+/**
  * Stop the Ollama this app started (never one the user runs themselves), with the model
  * runner it started: killing only the server leaves that runner holding the GPU memory.
  */
@@ -285,6 +303,11 @@ async function* jsonLines(res: Response): AsyncGenerator<Record<string, any>> {
 }
 
 export async function pullModel(model: string, progress: Progress, signal: AbortSignal): Promise<void> {
+  const size = LOCAL_MODELS.find((m) => m.model === model)?.downloadGB
+  if (size) {
+    const free = await freeBytes(process.env.OLLAMA_MODELS || join(homedir(), '.ollama', 'models'))
+    if (free < size * 1.1 * GB) throw new Error(`Not enough free disk space for ${model}: it needs about ${fmtGB(size * 1.1 * GB)}, and ${fmtGB(free)} is free. Free some space, or choose the smaller model.`)
+  }
   const res = await net.fetch(`${API}/api/pull`, { method: 'POST', body: JSON.stringify({ model, stream: true }), headers: { 'content-type': 'application/json' }, signal })
   if (!res.ok) throw new Error(`Ollama could not download ${model} (HTTP ${res.status}).`)
   const parts = new Map<string, { total: number; completed: number }>()
@@ -326,31 +349,43 @@ export async function speedTest(model: string, signal: AbortSignal): Promise<Spe
     'Why does adding a series inductor move a load clockwise on the Smith chart?',
     'What does the distance from the centre of the Smith chart tell you about a load?'
   ]
+  // On a slow machine each question stops after 90 s: the speed so far is the answer (a slow verdict, not an error).
   const runs: Array<{ firstS: number; tps: number }> = []
   for (const q of questions) {
     const t1 = Date.now()
     let first = 0
+    let firstChunk = 0
+    let chunks = 0
     let evalCount = 0
     let evalNs = 0
-    const res = await post('/api/chat', {
-      model,
-      stream: true,
-      keep_alive: '15m',
-      options: { num_predict: 1500 },
-      messages: [
-        { role: 'system', content: 'You are a patient Smith chart tutor. Answer in two or three short sentences.' },
-        { role: 'user', content: q }
-      ]
-    }, 180_000)
-    if (!res.ok) throw new Error(`Ollama could not run ${model} (HTTP ${res.status}).`)
-    for await (const j of jsonLines(res)) {
-      if (j.error) throw new Error(`Ollama: ${j.error}`)
-      // Thinking models reason first; the learner waits for the answer itself.
-      if (!first && typeof j.message?.content === 'string' && j.message.content.trim()) first = Date.now()
-      if (j.done) { evalCount = j.eval_count ?? 0; evalNs = j.eval_duration ?? 0 }
+    try {
+      const res = await post('/api/chat', {
+        model,
+        stream: true,
+        keep_alive: '15m',
+        options: { num_predict: 1500 },
+        messages: [
+          { role: 'system', content: 'You are a patient Smith chart tutor. Answer in two or three short sentences.' },
+          { role: 'user', content: q }
+        ]
+      }, Number(process.env.SMITH_SPEED_LIMIT_MS) || 90_000) // dev aid: a short limit to test the slow-machine path
+      if (!res.ok) throw new Error(`Ollama could not run ${model} (HTTP ${res.status}).`)
+      for await (const j of jsonLines(res)) {
+        if (j.error) throw new Error(`Ollama: ${j.error}`)
+        chunks++
+        firstChunk ||= Date.now()
+        // Thinking models reason first; the learner waits for the answer itself.
+        if (!first && typeof j.message?.content === 'string' && j.message.content.trim()) first = Date.now()
+        if (j.done) { evalCount = j.eval_count ?? 0; evalNs = j.eval_duration ?? 0 }
+      }
+    } catch (e) {
+      if (signal.aborted || !/timeout|aborted/i.test(String((e as Error)?.name) + (e as Error)?.message)) throw e
     }
-    // No answer at all within the cap counts as the whole wait.
-    runs.push({ firstS: ((first || Date.now()) - t1) / 1000, tps: evalNs ? evalCount / (evalNs / 1e9) : 0 })
+    // Each streamed piece is about one token; Ollama's exact count replaces it when the answer finished.
+    const elapsed = (Date.now() - (firstChunk || t1)) / 1000
+    const tps = evalNs ? evalCount / (evalNs / 1e9) : elapsed > 0 ? chunks / elapsed : 0
+    // No answer at all within the limits counts as the whole wait.
+    runs.push({ firstS: ((first || Date.now()) - t1) / 1000, tps })
   }
   const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 

@@ -408,7 +408,7 @@ export const useTutor = create<TutorState>((set, get) => {
     const provider = activeProvider()
     const profile = useApp.getState().profile
     if (!provider || !profile) {
-      pushItem({ kind: 'error', text: 'No model selected. Open the Models tab to add one (Claude, OpenAI, Gemini, Ollama…).' })
+      pushItem({ kind: 'error', text: 'No tutor model yet. Open the Models tab: the free local tutor sets itself up in one click, or add a cloud model (Claude, Gemini, GPT) with an API key.' })
       return
     }
     const tools = toolsFor(provider.supportsTools)

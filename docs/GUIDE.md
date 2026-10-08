@@ -68,7 +68,8 @@ The card at the top of the Models tab sets up a local tutor in one click, with n
    The reason is shown in plain words, and a smaller model is always one click away.
 3. **It sets it up.**
    - **Ollama:** if there's no Ollama, it downloads the official standalone build for this OS into the per-user local app-data folder (on Windows `%LOCALAPPDATA%\SmithChartTutor\ollama`, not the roaming profile). The download is checked against Ollama's published checksum.
-   - **Running it:** the app starts it while it runs and stops it when the app closes. It never stops an Ollama you run yourself.
+   - **Running it:** the app starts it when the app opens, and again whenever a lesson or the model list needs it (for example after it was closed from its tray). The app stops its own copy, with the model runner, when it closes. It never stops an Ollama you run yourself.
+   - **One setup at a time:** the setup keeps going if you switch tabs, and a second one waits until the first finishes. A model download that won't fit on the disk is stopped before it starts, and a very slow machine gets a *slow* verdict rather than an error.
    - **The model:** it downloads the model with a progress bar. Downloads go through Electron's network stack, so the system proxy and company certificates apply.
 4. **It measures this machine.**
    - It loads the model once, which is timed separately because it happens once per session.

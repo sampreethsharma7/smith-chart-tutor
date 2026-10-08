@@ -61,7 +61,10 @@ if [ ! -x "$NODE_HOME/bin/node" ]; then
     fail "The Node.js download did not match its published checksum, so it was not used." "Run the start file again to download it afresh."
   fi
 
-  tar -xf "$RT/$NAME.$EXT" -C "$RT" || fail "Could not unpack Node.js."
+  # Unpack beside, then move into place: a window closed halfway never leaves a half-unpacked Node.
+  rm -rf "$RT/unpack" && mkdir -p "$RT/unpack"
+  tar -xf "$RT/$NAME.$EXT" -C "$RT/unpack" || fail "Could not unpack Node.js."
+  rm -rf "$NODE_HOME" && mv "$RT/unpack/$NAME" "$NODE_HOME" && rm -rf "$RT/unpack"
   rm -f "$RT/$NAME.$EXT" "$RT/SHASUMS256.txt"
 fi
 

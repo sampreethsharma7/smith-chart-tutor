@@ -165,7 +165,7 @@ The memory lives in the app, not the model, so it's the same whichever model tea
 
 **No admin rights, no installers, nothing to set up first.** This works on locked-down work and university laptops.
 
-1. **Download** the ZIP (green **Code** button → **Download ZIP**) and **extract** it somewhere in your user folder, for example `Documents\SmithChartTutor`.
+1. **Download** the ZIP (green **Code** button → **Download ZIP**). On Windows, first right-click the ZIP → **Properties** → tick **Unblock** → **OK**. This stops Windows from blocking the app as "downloaded from the internet". Then **extract** it somewhere in your user folder, for example `Documents\SmithChartTutor`.
 2. **Double-click the start file for your system:**
 
    | Windows 10 / 11 | macOS | Linux |
@@ -186,6 +186,7 @@ Files downloaded from the internet get one extra check the first time:
 
 - **macOS:** if it says the file can't be opened, **right-click** `Start-Mac.command` → **Open** → **Open**. If it says you don't have permission, open Terminal and run `bash ` followed by a space, then drag the file into the Terminal window and press Enter.
 - **Windows:** if SmartScreen says "Windows protected your PC", click **More info** → **Run anyway**.
+- **Windows, "Smart App Control blocked…":** delete the extracted folder, right-click the ZIP → **Properties** → tick **Unblock** → **OK**, and extract it again. Unblock needs no admin rights; turning Smart App Control off does, and isn't needed.
 
 </details>
 
@@ -200,7 +201,15 @@ Files downloaded from the internet get one extra check the first time:
 
 </details>
 
-**Updating:** download the new ZIP, extract it, and start it the same way. Your profiles, progress and keys are kept separately in your user data folder, so they carry over. **Uninstalling:** delete the folder. To remove your data too, use **Profiles → Open data folder** first.
+**Updating:** download the new ZIP, extract it (into a new folder, or over the old one), and start it the same way. Your profiles, progress and keys are kept separately in your user data folder, so they carry over.
+
+**Uninstalling:**
+
+1. Delete the app folder.
+2. If you used the free local tutor, also delete:
+   - the app's Ollama copy (Windows `%LOCALAPPDATA%\SmithChartTutor`; macOS `~/Library/Application Support/SmithChartTutor`; Linux `~/.local/share/SmithChartTutor`)
+   - the models, in `.ollama` in your home folder. Keep this one if you use Ollama for other things.
+3. To remove your profiles and keys too, use **Profiles → Open data folder** before step 1, and delete that folder.
 
 **In the app:**
 

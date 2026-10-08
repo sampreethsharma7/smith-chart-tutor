@@ -90,7 +90,7 @@ export const CONNECTION_PRESETS: ConnectionPreset[] = [
   },
   {
     id: 'ollama', label: 'Ollama (local)', kind: 'openai', baseUrl: 'http://localhost:11434/v1', needsKey: false,
-    hint: 'Free and offline. Pull models with `ollama pull <model>`; pick tool-capable ones (qwen2.5, qwen3, llama3.1…).',
+    hint: 'Free and offline. The "Free local tutor" card above sets up the best model for this computer; any other tool-capable model you have in Ollama (qwen3, qwen2.5, llama3.1…) can be chosen here too.',
     suggested: [], filter: /embed/i
   },
   {

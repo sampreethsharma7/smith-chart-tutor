@@ -38,7 +38,13 @@ if not defined EXPECTED goto :hasherror
 certutil -hashfile "%RT%\%NODE_NAME%.zip" SHA256 > "%RT%\hash.txt" 2>nul || goto :hasherror
 findstr /i /c:"%EXPECTED%" "%RT%\hash.txt" >nul || goto :hasherror
 
-tar.exe -xf "%RT%\%NODE_NAME%.zip" -C "%RT%" || goto :unpackerror
+rem Unpack beside, then move into place: a window closed halfway never leaves a half-unpacked Node.
+if exist "%RT%\unpack" rmdir /s /q "%RT%\unpack"
+mkdir "%RT%\unpack"
+tar.exe -xf "%RT%\%NODE_NAME%.zip" -C "%RT%\unpack" || goto :unpackerror
+if exist "%NODE_HOME%" rmdir /s /q "%NODE_HOME%"
+move "%RT%\unpack\%NODE_NAME%" "%NODE_HOME%" >nul || goto :unpackerror
+rmdir /s /q "%RT%\unpack" >nul 2>&1
 del /q "%RT%\%NODE_NAME%.zip" "%RT%\SHASUMS256.txt" "%RT%\hash.txt" >nul 2>&1
 
 :run

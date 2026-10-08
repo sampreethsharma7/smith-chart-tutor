@@ -1,12 +1,13 @@
 // The second half of the one-click start (Start-Windows.cmd, Start-Mac.command, Start-Linux.sh).
 // Those scripts only fetch a private Node.js into .runtime/; this does the rest, the same on
 // every OS: install the app's components when they're missing or changed, build the app when
-// its source is newer than the last build, then start it and get out of the way.
+// its source differs from the last build, then start it and get out of the way.
 // Nothing is installed system-wide and no admin rights are needed.
 //
 //   node scripts/launch.mjs [--no-launch]
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,8 +27,33 @@ function fail(what, hints = []) {
 const NETWORK_HINTS = [
   'Check the internet connection, then double-click the start file again: it carries on where it stopped.',
   'On a company network, a proxy may block downloads. If your IT uses one, set HTTPS_PROXY (e.g. http://proxy.company.com:8080) and try again.',
-  'The first run downloads about 150 MB from registry.npmjs.org and github.com.'
+  'The first run downloads about 150 MB from registry.npmjs.org and github.com, and needs about 600 MB of free disk space.',
+  'Antivirus software sometimes locks files while it scans them: waiting a minute and trying again usually helps.'
 ]
+
+// One setup at a time: a second double-click while the first is still installing would corrupt it.
+const lockPath = join(runtime, 'setup.lock')
+function alive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return e.code === 'EPERM'
+  }
+}
+if (existsSync(lockPath)) {
+  const pid = Number(readFileSync(lockPath, 'utf8'))
+  if (pid && pid !== process.pid && alive(pid)) {
+    console.log("\n  Setup is already running in another window. The app opens from there when it's ready.\n")
+    process.exit(0)
+  }
+}
+writeFileSync(lockPath, String(process.pid))
+process.on('exit', () => {
+  try {
+    if (readFileSync(lockPath, 'utf8') === String(process.pid)) rmSync(lockPath)
+  } catch {}
+})
 
 // The environment for npm and the app: our Node first on PATH, npm's cache inside .runtime, no nagging.
 const env = { ...process.env }
@@ -78,19 +104,30 @@ if (!electronBinary() || !existsSync(installedStamp) || readFileSync(installedSt
   installed = true
 }
 
-// ── 2. The build: again only when something it's made from is newer than the last build ──
+// ── 2. The build: again only when what it's made from has changed ──
+// By content, not file dates: a new ZIP extracted over this folder keeps the ZIP's (older) dates.
 const buildStamp = join(root, 'out', '.build-stamp')
-function newest(p) {
-  if (!existsSync(p)) return 0
-  const s = statSync(p)
-  if (!s.isDirectory()) return s.mtimeMs
-  return Math.max(0, ...readdirSync(p).map((f) => newest(join(p, f))))
+function hashTree(h, p) {
+  if (!existsSync(p)) return
+  if (statSync(p).isDirectory()) {
+    for (const f of readdirSync(p).sort()) hashTree(h, join(p, f))
+  } else {
+    h.update(p.slice(root.length)).update(readFileSync(p))
+  }
 }
-const sources = ['src', 'package.json', 'electron.vite.config.ts', 'tsconfig.json'].map((f) => join(root, f))
-if (installed || !existsSync(buildStamp) || Math.max(...sources.map(newest)) > statSync(buildStamp).mtimeMs) {
+const sourceHash = (() => {
+  const h = createHash('sha256')
+  for (const f of ['src', 'package.json', 'package-lock.json', 'electron.vite.config.ts', 'tsconfig.json']) hashTree(h, join(root, f))
+  return h.digest('hex')
+})()
+const built = existsSync(buildStamp) ? readFileSync(buildStamp, 'utf8').trim() : ''
+if (installed || built !== sourceHash || !existsSync(join(root, 'out', 'main', 'index.js'))) {
   console.log('\n  [3/3] Building the app…\n')
-  npm(['run', 'build', '--', '--logLevel', 'warn'], ['Delete the "out" folder in this folder and try again.'])
-  writeFileSync(buildStamp, new Date().toISOString())
+  // The build tool runs directly with Node, not through "npm run": npm runs scripts through
+  // Windows' cmd, which breaks on folder names with "&" (e.g. "R&D").
+  const r = spawnSync(process.execPath, [join(root, 'node_modules', 'electron-vite', 'bin', 'electron-vite.js'), 'build', '--logLevel', 'warn'], { stdio: 'inherit', env, cwd: root })
+  if (r.status !== 0) fail('The app could not be built.', ['Delete the "out" folder in this folder and try again.', 'If it keeps failing, extract the ZIP again into a new folder.'])
+  writeFileSync(buildStamp, sourceHash)
 }
 
 // ── 3. Start it, detached, so this window can close ──

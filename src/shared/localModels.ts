@@ -85,13 +85,13 @@ export function recommendLocal(m: MachineInfo): Recommendation {
   if (m.ramGB >= 8) {
     return {
       pick: small, runsOn: 'cpu',
-      reason: `No GPU that a local model can use was found, so it will run on the processor. ${small.model} is small enough to stay usable there; it scored ${pct(small.score)} on the tutor benchmark.`,
+      reason: `No NVIDIA or Apple Silicon GPU was found, so it will run on the processor. ${small.model} is small enough to stay usable there; it scored ${pct(small.score)} on the tutor benchmark.`,
       caution: 'On the processor, answers come slower than from a cloud model. The speed check after setup will tell you how slow.'
     }
   }
   return {
     pick: null, runsOn: 'cpu',
-    reason: `This computer has ${gb(m.ramGB)} of memory and no GPU a local model can use: too little to run a local tutor well.`,
+    reason: `This computer has ${gb(m.ramGB)} of memory and no NVIDIA or Apple Silicon GPU: too little to run a local tutor well.`,
     caution: 'Use a cloud model instead (Models → add Anthropic, Google Gemini or OpenAI). Several have free or cheap tiers.'
   }
 }
