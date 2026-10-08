@@ -94,19 +94,22 @@ describe('patterns: a confusion that keeps coming back', () => {
     expect(patternsOf(twoLessons)[0]).toMatchObject({ status: 'active', lessons: 2 })
   })
 
-  it('fades with clean answers after it was last seen, is gone after two lessons of them, and comes back on a new slip', () => {
+  it('looks better with clean answers in later lessons, clears at its bar, is confirmed by one more, and comes back as a relapse with a higher bar', () => {
     let p = createProfile('A')
     p = slip(p, 'z_vs_y', 'plot_y', 'L1', '2026-09-01T00:00:00Z')
     p = slip(p, 'z_vs_y', 'read_y', 'L2', '2026-09-08T00:00:00Z')
     // Right answers BEFORE it was last seen don't count.
     p = rightIn(p, 'plot_y', 'L1', '2026-09-01T00:30:00Z')
-    expect(patternsOf(p)[0].status).toBe('active')
+    expect(patternsOf(p)[0]).toMatchObject({ status: 'active', signoff: { points: 0, required: 2 } })
     p = rightIn(p, 'plot_y', 'L3', '2026-09-15T00:00:00Z')
-    expect(patternsOf(p)[0].status).toBe('fading')
+    expect(patternsOf(p)[0]).toMatchObject({ status: 'improving', signoff: { points: 1 } })
     p = rightIn(p, 'read_y', 'L4', '2026-09-22T00:00:00Z')
-    expect(patternsOf(p)[0].status).toBe('gone')
-    const back = slip(p, 'z_vs_y', 'dir_shuntL', 'L5', '2026-09-29T00:00:00Z')
-    expect(patternsOf(back)[0].status).toBe('active')
+    expect(patternsOf(p)[0].status).toBe('cleared')
+    p = rightIn(p, 'plot_y', 'L5', '2026-09-26T00:00:00Z')
+    expect(patternsOf(p)[0].status).toBe('confirmed')
+    const back = slip(p, 'z_vs_y', 'dir_shuntL', 'L6', '2026-09-29T00:00:00Z')
+    expect(patternsOf(back)[0]).toMatchObject({ status: 'active', relapses: 1 })
+    expect(patternsOf(back)[0].signoff.required).toBeGreaterThan(2)
     expect(patternNews(p, back)[0]).toMatch(/^PATTERN BACK: Mixes up impedance and admittance/)
   })
 
@@ -117,7 +120,7 @@ describe('patterns: a confusion that keeps coming back', () => {
     expect(patternNews(p, q)).toEqual([expect.stringMatching(/^NEW PATTERN: Forgets the 2π .* seen 2× in 2 topic\(s\) over 2 lesson\(s\)/)])
     const r = slip(q, 'two_pi', 'l_match', 'L3', '2026-09-15T00:00:00Z')
     expect(patternNews(q, r)).toEqual([])
-    expect(patternsBrief(r)).toMatch(/^Patterns .*two_pi \[active\] Forgets the 2π.*seen 3×.*Check it with: ask_component for a series and a shunt part, then ask_spot_error with mistake "formula"/)
+    expect(patternsBrief(r)).toMatch(/^Patterns .*two_pi \[still there, 0\/2\.5\] Forgets the 2π.*seen 3×.*Check it with: ask_component for a series and a shunt part, then ask_spot_error with mistake "formula"/)
   })
 
   it('the record is bounded', () => {

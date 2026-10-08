@@ -243,8 +243,8 @@ The targets come from how the app grades, not from other learners. The page has 
 - **The record:** it keeps each mistake as a "slip" (up to 150). The tutor adds what it hears in conversation through `log_misconception`'s `confusion` field.
 - **The pattern lifecycle:**
   - The same confusion in **two topics or two lessons** is a pattern.
-  - It **fades** after a lesson of clean answers on its topics, and is **gone** after two.
-  - A new slip brings it back.
+  - It clears by the adaptive sign-off below: **looking better**, then **cleared** (to re-check), then **confirmed** after one more clean lesson.
+  - A new slip brings it back as a relapse, with a higher bar.
   - The status is worked out from the record each time, so it can't drift.
 - **What the tutor gets:**
   - "NEW PATTERN" / "PATTERN BACK" in the result of the answer that triggered it.
@@ -270,7 +270,12 @@ The app keeps it, so it's the same whichever model teaches, and it stays small h
   - the topic's **next review date**: tomorrow after a miss, then 3, 7, 14 and 30 days as you keep getting it right
 
   The tutor can't record the same answer again. Its own `record_evidence` is for what can't be graded, such as explanations and reasoning.
-- **Misconceptions are tied to topics.** A wrong pick on a move question records exactly which wrong idea it shows. A misconception closes by itself after right answers in **two separate lessons**, and reopens if you slip again. Older ones get their topic from their wording.
+- **Misconceptions are tied to topics.** A wrong pick on a move question records exactly which wrong idea it shows. A misconception clears by itself through the adaptive sign-off, and reopens if you slip again. Older ones get their topic from their wording.
+- **Adaptive sign-off** ([signoff.ts](../src/shared/signoff.ts)): when is a mistake really fixed?
+  - **Evidence** comes only from lessons after the one it appeared in. Each such lesson counts once: 1 for a right graded answer, plus ¼ each if they were sure, gave the right reason, or did it in a new situation, at most 1.5. The tutor's own observations (`record_evidence`, which must say the `reason` and whether it was `transfer`) count half.
+  - **The bar** is 2 by default, about two lessons. It moves with the learner's record: retention (how often cleared mistakes came back), pace (share of graded answers right) and calibration (right when sure). Each is pulled toward the default, and the whole is scaled by how much history there is, so a new learner gets the standard bar. It ranges from 1.25 (one strong lesson, for someone whose fixes stick) up to 4.
+  - **Deeper mistakes need more:** seen many times or over several lessons, sure of it, or back after being cleared. The deepest also need one lesson in a new situation.
+  - **Cleared is provisional:** one clean lesson later confirms it. The tutor speaks in these words (looking better, cleared, confirmed) and can't declare a mistake fixed: `resolve_misconception` only removes one recorded by mistake.
 - **Notes are few and categorised:** goal, preference, what clicked, struggle, other. At most 5 are kept per category. A near-duplicate replaces the older note; the tutor can update or delete notes, and so can you, on Progress.
 - **The tutor plans from a short brief.** It's rebuilt every turn and bounded in size:
   - your goals

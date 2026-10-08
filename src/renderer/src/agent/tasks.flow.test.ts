@@ -397,7 +397,7 @@ describe('memory: graded answers update the learner model by themselves', () => 
     const r = await runTool('ask_move', { element: { kind: 'shuntC', value: 2e-12 }, from: 'load' }, ctx)
     expect(r.content).toMatch(/Practises: which way a shunt C moves the point \(dir_shuntC\), level 2; their aim for it is 1 \(harder than their aim: a stretch; expect to support them\)/)
     expect(app.profile.asked.at(-1)).toMatchObject({ topic: 'dir_shuntC', kind: 'move' })
-    script.push(call('record_evidence', { skill: 'lumped_moves', outcome: 'incorrect', difficulty: 1 }), text('Which way does adding capacitance push b?'))
+    script.push(call('record_evidence', { skill: 'lumped_moves', outcome: 'incorrect', difficulty: 1, reason: 'wrong', transfer: false }), text('Which way does adding capacitance push b?'))
     await answerNow('Counter-clockwise along its constant-g circle')
     expect(app.profile.skills.lumped_moves.mastery).toBeLessThan(before)
     expect(app.profile.topics.dir_shuntC).toMatchObject({ seen: 1, correct: 0, level: 1 })
@@ -411,7 +411,7 @@ describe('memory: graded answers update the learner model by themselves', () => 
 
   it('the next turn, the tutor may record its own observation again', async () => {
     useTutor.setState({ learnerTurns: 2 })
-    script.push(call('record_evidence', { skill: 'lumped_moves', outcome: 'partial', difficulty: 2, note: 'explained the g circle well' }), text('Good reasoning.'))
+    script.push(call('record_evidence', { skill: 'lumped_moves', outcome: 'partial', difficulty: 2, reason: 'right', transfer: false, note: 'explained the g circle well' }), text('Good reasoning.'))
     await useTutor.getState().send('Shunt elements keep g constant because they add susceptance only.')
     expect(allText(requests[1])).toMatch(/mastery_after/)
   })
@@ -660,7 +660,7 @@ describe('patterns: the same confusion across topics reaches the tutor', () => {
     const said = lastUserText(requests.at(-1)!)
     expect(said).toMatch(/NEW PATTERN: Mixes up impedance and admittance \(z and y\), seen 2× in 2 topic\(s\)/)
     // The brief now leads with it, and the slips are kept.
-    expect(JSON.stringify(requests.at(-1)!.system)).toMatch(/Patterns \(the same confusion across topics or lessons; work on these first\): z_vs_y \[active\]/)
+    expect(JSON.stringify(requests.at(-1)!.system)).toMatch(/Patterns \(the same confusion across topics or lessons; work on these first\): z_vs_y \[still there, 0\/2\]/)
     expect(app.profile.slips.map((x: any) => x.confusion)).toEqual(['z_vs_y', 'series_vs_shunt', 'z_vs_y'])
   })
 
@@ -719,9 +719,9 @@ describe('robustness: what the QA pass found', () => {
 
   it('record_evidence is allowed again in a new lesson at the same turn number', async () => {
     const lessonCtx = (id: string) => ({ ...ctx, session: () => ({ id }), learnerTurns: () => 3, autoRecorded: () => false })
-    expect((await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2 }, lessonCtx('lesson-a'))).isError).toBe(false)
-    expect((await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2 }, lessonCtx('lesson-a'))).isError).toBe(true)
-    expect((await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2 }, lessonCtx('lesson-b'))).isError).toBe(false)
+    expect((await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2, reason: 'none', transfer: false }, lessonCtx('lesson-a'))).isError).toBe(false)
+    expect((await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2, reason: 'none', transfer: false }, lessonCtx('lesson-a'))).isError).toBe(true)
+    expect((await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2, reason: 'none', transfer: false }, lessonCtx('lesson-b'))).isError).toBe(false)
   })
 
   it('a bad override or outcome from a model never reaches the record', async () => {
@@ -815,5 +815,44 @@ describe('ask_component: the step from the chart to a real part, graded', () => 
     const bad = await runTool('ask_component', { question: 'q', connection: 'series', from_point: { r: 0.6, x: 0.4 }, to_point: { r: 1, x: 0 } }, ctx)
     expect(bad.isError).toBe(true)
     expect(bad.content).toMatch(/keeps r fixed/)
+  })
+})
+
+describe('adaptive sign-off: the tutor logs the reason and transfer; the app decides', () => {
+  const lesson = (id: string, turn = 1) => ({ ...ctx, session: () => ({ id }), learnerTurns: () => turn, autoRecorded: () => false })
+  const observe = (id: string, turn: number) =>
+    runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2, reason: 'right', transfer: true, topic: 'gamma_vswr' }, lesson(id, turn))
+
+  it('record_evidence needs the reason and transfer, and keeps them as structured evidence', async () => {
+    const missing = await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2 }, lesson('L1'))
+    expect(missing.isError).toBe(true)
+    expect(missing.content).toMatch(/Give "reason"/)
+    const noTransfer = await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2, reason: 'right' }, lesson('L1'))
+    expect(noTransfer.content).toMatch(/Give "transfer"/)
+    const ok = await runTool('record_evidence', { skill: 'reflection', outcome: 'correct', difficulty: 2, reason: 'right', transfer: true, topic: 'gamma_vswr', note: 'explained why' }, lesson('L1'))
+    expect(ok.isError).toBe(false)
+    expect(app.profile.observations.at(-1)).toMatchObject({ session: 'L1', skill: 'reflection', topic: 'gamma_vswr', outcome: 'correct', reason: 'right', transfer: true })
+  })
+
+  it('its observations clear a misconception only in later lessons, and it hears where it stands in the app\'s words', async () => {
+    await runTool('log_misconception', { skill: 'reflection', topic: 'gamma_vswr', description: 'Confuses Γ with VSWR' }, lesson('L1', 1))
+    // Same lesson: right, with the reason, in a new situation, and still it doesn't count.
+    expect((await observe('L1', 2)).content).toMatch(/doesn't count toward clearing it \(same lesson it appeared in\)/)
+    // A later lesson: the tutor's judgement counts half (0.5), the right reason and transfer ¼ each.
+    expect((await observe('L2', 1)).content).toMatch(/looking better \(evidence 1 of 2\)/)
+    expect(app.profile.misconceptions[0].resolved).toBe(false)
+    expect((await observe('L3', 1)).content).toMatch(/cleared, provisionally.*don't call it fixed/)
+    expect(app.profile.misconceptions[0].resolved).toBe(true)
+  })
+
+  it('resolve_misconception only removes one recorded by mistake; it can\'t declare one fixed', async () => {
+    await runTool('log_misconception', { skill: 'reflection', topic: 'gamma_vswr', description: 'Confuses Γ with VSWR' }, lesson('L1', 1))
+    const id = app.profile.misconceptions[0].id
+    const noWhy = await runTool('resolve_misconception', { id }, lesson('L1', 2))
+    expect(noWhy.isError).toBe(true)
+    expect(noWhy.content).toMatch(/If they have overcome it, don't remove it/)
+    const r = await runTool('resolve_misconception', { id, why: 'I misread their answer' }, lesson('L1', 2))
+    expect(r.isError).toBe(false)
+    expect(app.profile.misconceptions).toHaveLength(0)
   })
 })

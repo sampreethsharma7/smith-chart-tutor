@@ -4,8 +4,9 @@ import { useApp } from '@/state/app'
 import { useTutor } from '@/agent/tutor'
 import { startLesson } from '@/state/journey'
 import { OutcomeBadge } from '@/components/LessonWrapUp'
-import { forgetNote, topicDef } from '@shared/memory'
-import { patternsOf, type Pattern } from '@shared/patterns'
+import { forgetNote, misconceptionSignOff, topicDef } from '@shared/memory'
+import { isLive, patternsOf, type Pattern } from '@shared/patterns'
+import { SIGNOFF_WORDS, trackOf, type SignOffStatus } from '@shared/signoff'
 import { Standing } from '@/components/Standing'
 
 export function ProgressView() {
@@ -14,6 +15,8 @@ export function ProgressView() {
   const sessions = [...lessonsOf(profile)].reverse()
   const open = profile.misconceptions.filter((m) => !m.resolved)
   const resolved = profile.misconceptions.filter((m) => m.resolved)
+  const track = trackOf(profile)
+  const recheck = resolved.filter((m) => misconceptionSignOff(profile, m, track).status === 'cleared').length
   const exercises = profile.sessions.flatMap((s) => s.exercises)
 
   return (
@@ -38,15 +41,19 @@ export function ProgressView() {
           <h3>Misconceptions</h3>
           {open.length === 0 && <div className="muted small">None open.</div>}
           <ul className="plain">
-            {open.map((m) => (
+            {open.map((m) => {
+              const so = misconceptionSignOff(profile, m, track)
+              return (
               <li key={m.id}>
-                <b>{skillName(m.skill)}</b> · seen {m.count}×{m.topic ? ' · closes itself after right answers in two lessons' : ''}<br />
+                <b>{skillName(m.skill)}</b> · seen {m.count}×{m.relapses ? ` · came back ${m.relapses}×` : ''}{' '}
+                <span className={`chip pattern-status ${so.status}`} title={`Needs ${so.needed}. Why this bar: ${so.why}.`}>{SIGNOFF_WORDS[so.status]}</span><br />
                 {m.description}{' '}
                 <button className="link" onClick={() => updateProfile((p) => ({ ...p, misconceptions: p.misconceptions.map((x) => (x.id === m.id ? { ...x, resolved: true } : x)) }))}>mark resolved</button>
+                <div className="muted small">Clears after: {so.needed} ({so.why}).</div>
               </li>
-            ))}
+            )})}
           </ul>
-          {resolved.length > 0 && <div className="muted small">{resolved.length} resolved</div>}
+          {resolved.length > 0 && <div className="muted small">{resolved.length} cleared{recheck ? `, ${recheck} still to re-check once in a later lesson` : ''}</div>}
 
           <h3>Tutor's notes about you</h3>
           <p className="muted small">What the tutor keeps in mind beyond your answers. Delete anything that's wrong or out of date.</p>
@@ -119,11 +126,11 @@ function SkillMoves({ s }: { s: SessionRecord }) {
   )
 }
 
-const STATUS_WORD: Record<Pattern['status'], string> = { active: 'active', fading: 'fading', gone: 'gone' }
-const STATUS_TIP: Record<Pattern['status'], string> = {
+const STATUS_TIP: Record<SignOffStatus, string> = {
   active: 'Seen recently: the tutor will work on the idea behind it',
-  fading: 'Right answers on it in one lesson since it was last seen; one more lesson like that and it is gone',
-  gone: 'Right answers on it in two lessons since it was last seen; it comes back if it turns up again'
+  improving: 'Right answers on it in a later lesson, but not enough yet to call it cleared',
+  cleared: 'Enough right answers in later lessons to clear it; one more in a later lesson confirms it',
+  confirmed: 'Cleared, and it held in a later lesson. It comes back if it turns up again'
 }
 
 /**
@@ -132,8 +139,8 @@ const STATUS_TIP: Record<Pattern['status'], string> = {
  */
 function Patterns({ patterns }: { patterns: Pattern[] }) {
   const [showGone, setShowGone] = useState(false)
-  const live = patterns.filter((x) => x.status !== 'gone')
-  const gone = patterns.filter((x) => x.status === 'gone')
+  const live = patterns.filter(isLive)
+  const gone = patterns.filter((x) => !isLive(x))
   return (
     <>
       <h3>Patterns the tutor has noticed</h3>
@@ -144,9 +151,10 @@ function Patterns({ patterns }: { patterns: Pattern[] }) {
           <div className="row">
             <b>{x.name}</b>
             <span className="spacer" />
-            <span className={`chip pattern-status ${x.status}`} title={STATUS_TIP[x.status]}>{STATUS_WORD[x.status]}</span>
+            <span className={`chip pattern-status ${x.status}`} title={STATUS_TIP[x.status]}>{SIGNOFF_WORDS[x.status]}</span>
           </div>
-          <div className="small muted">Seen {x.slips.length}× in {x.topics.length} topic{x.topics.length === 1 ? '' : 's'}, over {x.lessons} lesson{x.lessons === 1 ? '' : 's'}.</div>
+          <div className="small muted">Seen {x.slips.length}× in {x.topics.length} topic{x.topics.length === 1 ? '' : 's'}, over {x.lessons} lesson{x.lessons === 1 ? '' : 's'}{x.relapses ? `; came back ${x.relapses}× after being cleared` : ''}.</div>
+          {x.status !== 'confirmed' && <div className="small muted">{x.status === 'cleared' ? 'To confirm' : 'Clears after'}: {x.signoff.needed} ({x.signoff.why}).</div>}
           <div className="small pattern-root"><span className="muted">The idea:</span> {x.root}</div>
           <ul className="plain small pattern-evidence">
             {x.slips.slice(-4).reverse().map((s, i) => (
@@ -155,7 +163,7 @@ function Patterns({ patterns }: { patterns: Pattern[] }) {
           </ul>
         </div>
       ))}
-      {gone.length > 0 && <button className="link small" onClick={() => setShowGone(!showGone)}>{showGone ? 'Hide' : 'Show'} {gone.length} gone</button>}
+      {gone.length > 0 && <button className="link small" onClick={() => setShowGone(!showGone)}>{showGone ? 'Hide' : 'Show'} {gone.length} cleared</button>}
     </>
   )
 }

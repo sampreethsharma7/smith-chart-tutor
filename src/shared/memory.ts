@@ -6,6 +6,7 @@
  * bounded brief that is what the tutor actually reads when planning.
  */
 import { applyEvidence, lessonsOf, SKILLS, type Misconception, type Outcome, type Profile, type SkillId, type Sure } from './profile'
+import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOff, type Track } from './signoff'
 
 // ── Topics: the specific things a learner can be good or shaky at ───────────
 
@@ -152,7 +153,7 @@ export interface TopicStat {
    * Their right answers (unaided and not hedged), newest last: in which lesson, at what
    * difficulty, in what context. Proof that a skill is strong, and closes misconceptions.
    */
-  rightIn: Array<{ session: string; at: string; d?: number; ctx?: string }>
+  rightIn: Array<{ session: string; at: string; d?: number; ctx?: string; sure?: boolean }>
 }
 
 /** Days until a topic is due again, by box: wrong answers come back tomorrow, solid ones a month later. */
@@ -173,7 +174,7 @@ export const aimFor = (p: Profile, topic: TopicId): Difficulty => p.topics?.[top
  * fragile: right but not sure of it. It counts as right, but doesn't move the level up,
  * isn't proof, and comes back for review a little sooner (one box back).
  */
-function updateTopic(p: Profile, m: GradedMeta, outcome: Outcome, session: string, at: string, fragile = false): TopicStat {
+function updateTopic(p: Profile, m: GradedMeta, outcome: Outcome, session: string, at: string, fragile = false, sure = false): TopicStat {
   const t: TopicStat = p.topics?.[m.topic] ?? { seen: 0, correct: 0, recent: [], streak: 0, level: startLevel(p, m.topic), box: 0, due: at, lastSeen: at, rightIn: [] }
   const score = outcome === 'correct' ? 1 : outcome === 'partial' ? 0.5 : 0
   let { level, streak, box } = t
@@ -199,7 +200,7 @@ function updateTopic(p: Profile, m: GradedMeta, outcome: Outcome, session: strin
     box,
     due: addDays(at, REVIEW_DAYS[box]),
     lastSeen: at,
-    rightIn: outcome === 'correct' && !fragile ? [...(t.rightIn ?? []), { session, at, d: m.difficulty, ...(m.ctx ? { ctx: m.ctx } : {}) }].slice(-8) : t.rightIn
+    rightIn: outcome === 'correct' && !fragile ? [...(t.rightIn ?? []), { session, at, d: m.difficulty, ...(m.ctx ? { ctx: m.ctx } : {}), ...(sure ? { sure } : {}) }].slice(-8) : t.rightIn
   }
 }
 
@@ -249,9 +250,27 @@ export function calibrationOf(p: Profile): Calibration {
 }
 
 /**
+ * Where a misconception stands (signoff.ts): the evidence on its topic since it was last seen, from
+ * later lessons only, judged against what this learner needs for a mistake this deep.
+ */
+export function misconceptionSignOff(p: Profile, x: Misconception, track: Track = trackOf(p)): SignOff {
+  const topic = inferTopic(x)
+  const last = x.sessions?.length ? x.sessions : [sessionAt(p, x.lastSeen)].filter((s): s is string => !!s)
+  const evidence = gatherEvidence(p, {
+    topics: topic ? [topic] : [], after: x.lastSeen, exclude: new Set(last),
+    seenCtx: new Set(x.ctxs ?? []), misconception: x.id
+  })
+  return signOff(evidence, track, { count: x.count, lessons: Math.max(1, x.sessions?.length ?? 1), relapses: x.relapses ?? 0, confident: x.confident })
+}
+
+/** Add a lesson / situation to where a misconception was seen (bounded). */
+const seenIn = (list: string[] | undefined, v: string | undefined) => (v && !list?.includes(v) ? [...(list ?? []), v].slice(-8) : list)
+
+/**
  * Apply one graded result: skill mastery (exact rule), the topic's level and review
- * date, and misconceptions on that topic (closed after right answers in two separate
- * lessons, reopened on a slip). Returns the new profile and a short report for the tutor.
+ * date, and misconceptions on that topic: cleared when the adaptive sign-off says so
+ * (signoff.ts: never in the lesson it appeared, the bar set by this learner's record),
+ * reopened on a slip with a higher bar. Returns the new profile and a short report for the tutor.
  */
 export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; report: string } {
   const { meta: m, at } = r
@@ -262,18 +281,32 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
   const weight = evidenceWeight(r.format, r.choices, r.outcome) * (fragile ? 0.6 : 1)
   const before = p.skills[m.skill]
   const skill = applyEvidence(before, outcome, m.difficulty, `app: ${r.label.slice(0, 60)}`, { weight, floor: r.outcome === 'correct' })
-  const topic = updateTopic(p, m, outcome, r.session, at, fragile)
+  const topic = updateTopic(p, m, outcome, r.session, at, fragile, r.sure === 'sure')
   const notes: string[] = []
   let misconceptions = p.misconceptions
   const onTopic = (x: Misconception) => inferTopic(x) === m.topic
 
   if (outcome === 'correct') {
+    const withAnswer: Profile = { ...p, topics: { ...(p.topics ?? {}), [m.topic]: topic } }
+    const track = trackOf(p)
     misconceptions = misconceptions.map((x) => {
-      if (!onTopic(x) || x.resolved) return x
-      const lessons = new Set(topic.rightIn.filter((e) => e.at > x.lastSeen).map((e) => e.session))
-      if (lessons.size < 2) return x
-      notes.push(`misconception resolved: "${x.description}" (right in ${lessons.size} lessons since)`)
-      return { ...x, topic: m.topic, resolved: true, resolvedAt: at }
+      if (!onTopic(x)) return x
+      const so = misconceptionSignOff(withAnswer, x, track)
+      const sameLesson = (x.sessions ?? []).includes(r.session) || (!x.sessions && sessionAt(p, x.lastSeen) === r.session)
+      if (x.resolved) {
+        if (so.status === 'confirmed' && !sameLesson) notes.push(`misconception confirmed gone: "${x.description}" (it held in a later lesson)`)
+        return x
+      }
+      if (sameLesson) {
+        notes.push(`misconception "${x.description}": this answer doesn't count toward clearing it (same lesson it appeared in: shows they followed, not that it's fixed)`)
+        return x
+      }
+      if (so.status === 'cleared' || so.status === 'confirmed') {
+        notes.push(`misconception cleared, provisionally: "${x.description}" (evidence ${so.points} of ${so.required}; ${so.why}). Tell them it's cleared and you'll check it again in a later lesson; don't call it fixed`)
+        return { ...x, topic: m.topic, resolved: true, resolvedAt: at }
+      }
+      notes.push(`misconception "${x.description}": looking better (evidence ${so.points} of ${so.required}; ${so.why}); still needs ${so.needed}. Say it's looking better, not fixed`)
+      return x
     })
   } else if ((outcome === 'incorrect' || (outcome === 'partial' && r.misconception)) && r.sure !== 'guess') {
     // A wrong guess is a gap, not a mental model; a wrong answer they were sure of is the real thing.
@@ -281,14 +314,19 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
     const confident = r.sure === 'sure'
     const existing = misconceptions.find(onTopic)
     if (existing) {
-      if (existing.resolved) notes.push(`misconception back: "${existing.description}"`)
+      if (existing.resolved) notes.push(`misconception back: "${existing.description}" (it had been cleared: the bar to clear it again is higher)`)
       misconceptions = misconceptions.map((x) => (x === existing
         // Keep the existing wording (often the tutor's, and better than a generated one); just count it.
-        ? { ...x, topic: m.topic, count: x.count + 1, lastSeen: at, resolved: false, resolvedAt: undefined, ...(confident ? { confident: true } : {}) }
+        ? {
+            ...x, topic: m.topic, count: x.count + 1, lastSeen: at, resolved: false, resolvedAt: undefined,
+            sessions: seenIn(x.sessions, r.session), ctxs: seenIn(x.ctxs, m.ctx),
+            ...(x.resolved ? { relapses: (x.relapses ?? 0) + 1 } : {}),
+            ...(confident ? { confident: true } : {})
+          }
         : x))
     } else if (r.misconception || confident) {
       const description = r.misconception ?? `Sure of a wrong answer on ${topicDef(m.topic)!.name}`
-      misconceptions = [...misconceptions, { id: `mc_${new Date(at).getTime().toString(36)}`, skill: m.skill, topic: m.topic, description, count: 1, firstSeen: at, lastSeen: at, resolved: false, ...(confident ? { confident: true } : {}) }]
+      misconceptions = [...misconceptions, { id: `mc_${new Date(at).getTime().toString(36)}`, skill: m.skill, topic: m.topic, description, count: 1, firstSeen: at, lastSeen: at, resolved: false, sessions: [r.session], ...(m.ctx ? { ctxs: [m.ctx] } : {}), ...(confident ? { confident: true } : {}) }]
       notes.push(`misconception noted: "${description}"`)
     }
     if (confident) notes.push('they were SURE of this wrong answer: a real misconception, worth undoing before moving on')
@@ -447,7 +485,16 @@ export function learnerBrief(p: Profile, now: string): BriefParts {
 
   const live = p.misconceptions.filter((m) => !m.resolved)
     .sort((a, b) => Number(!!b.confident) - Number(!!a.confident) || b.lastSeen.localeCompare(a.lastSeen) || b.count - a.count).slice(0, 4)
-  if (live.length) lines.push(`Live misconceptions: ${live.map((m) => `[${m.id}] ${m.description} (${inferTopic(m) ?? m.skill}, ${m.count}×${m.confident ? ', they were sure: undo this first' : ''})`).join('; ')}`)
+  const track = trackOf(p)
+  if (live.length) {
+    lines.push(`Live misconceptions: ${live.map((m) => {
+      const so = misconceptionSignOff(p, m, track)
+      return `[${m.id}] ${m.description} (${inferTopic(m) ?? m.skill}, ${m.count}×${m.relapses ? `, back ${m.relapses}× after clearing` : ''}${m.confident ? ', they were sure: undo this first' : ''}) ${SIGNOFF_WORDS[so.status]}, ${so.points}/${so.required}`
+    }).join('; ')} (their bar: ${track.why})`)
+  }
+  // Cleared, not yet confirmed: check each once more in a fresh situation.
+  const recheck = p.misconceptions.filter((m) => m.resolved && misconceptionSignOff(p, m, track).status === 'cleared').slice(0, 3)
+  if (recheck.length) lines.push(`Cleared, to re-check in a later lesson (one clean answer in a new situation confirms it): ${recheck.map((m) => `[${m.id}] ${m.description}`).join('; ')}`)
   const cal = calibrationOf(p)
   if (cal.verdict !== 'unknown') {
     const pc = (x: { n: number; right: number }) => (x.n ? `${Math.round((x.right / x.n) * 100)}% right (${x.n})` : 'no answers')

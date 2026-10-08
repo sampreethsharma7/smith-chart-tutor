@@ -1,6 +1,7 @@
 import { applyEvidence, JUDGEMENT_CAP, overallLevel, setMastery, SKILLS, skillName, type Outcome, type SkillId } from '@shared/profile'
 import { skillStanding, standingForTutor } from '@shared/standing'
-import { forgetNote, inferTopic, learnerBrief, NOTE_CATEGORIES, saveNote, TOPIC_IDS, topicDef, type NoteCategory, type TopicId } from '@shared/memory'
+import { forgetNote, inferTopic, learnerBrief, misconceptionSignOff, NOTE_CATEGORIES, saveNote, TOPIC_IDS, topicDef, type NoteCategory, type TopicId } from '@shared/memory'
+import { SIGNOFF_WORDS, trackOf, type Observation } from '@shared/signoff'
 import { addSlips, CONFUSION_IDS, CONFUSIONS, patternNews, patternsOf, type Confusion } from '@shared/patterns'
 import { defineTools, type ToolContext } from '../types'
 
@@ -100,7 +101,10 @@ export default defineTools([
         })),
         next_focus: p.nextFocus ?? null,
         standing: standingForTutor(p, new Date().toISOString()),
-        open_misconceptions: p.misconceptions.filter((m) => !m.resolved),
+        open_misconceptions: p.misconceptions.filter((m) => !m.resolved).map((m) => {
+          const so = misconceptionSignOff(p, m)
+          return { ...m, status: SIGNOFF_WORDS[so.status], evidence: `${so.points} of ${so.required}`, needs: so.needed, why_this_bar: so.why }
+        }),
         brief: learnerBrief(p, new Date().toISOString()).text,
         patterns: patternsOf(p).map((x) => ({ confusion: x.confusion, name: x.name, status: x.status, seen: x.slips.length, topics: x.topics, lessons: x.lessons, last_seen: x.lastSeen, evidence: x.slips.slice(-4).map((s) => `${s.at.slice(0, 10)} ${s.topic ?? 'conversation'}: ${s.detail}`), root: x.root, check_with: x.probe })),
         topics: p.topics ?? {},
@@ -112,16 +116,21 @@ export default defineTools([
   },
   {
     name: 'record_evidence',
-    description: 'Update the learner model after you observe them using a skill in a way the app cannot grade: an explanation, their reasoning, a good or confused question, an ungraded prediction. Graded tasks and questions are recorded automatically; don\'t record those again. Mastery moves by a fixed rule from outcome and difficulty (1 easy, 2 medium, 3 hard).',
+    description: 'Update the learner model after you observe them using a skill in a way the app cannot grade: an explanation, their reasoning, a good or confused question, an ungraded prediction. Graded tasks and questions are recorded automatically; don\'t record those again. Mastery moves by a fixed rule from outcome and difficulty (1 easy, 2 medium, 3 hard). ' +
+      'Always say whether they gave the right reason and whether it was transfer (a new situation): with the topic, this is evidence the app uses to decide when a misconception is cleared.',
     parameters: {
       type: 'object',
       properties: {
         skill: { type: 'string', enum: SKILL_IDS },
         outcome: { type: 'string', enum: ['correct', 'partial', 'incorrect'] },
         difficulty: { type: 'number', enum: [1, 2, 3] },
+        reason: { type: 'string', enum: ['right', 'partial', 'wrong', 'none'], description: 'The reason they gave: right, partly right, wrong, or none (not given or not asked)' },
+        transfer: { type: 'boolean', description: 'true if they did it in a new situation, different from where they learned it or got it wrong (other half of the chart, other side of r = 1, a different element or quantity, their own design)' },
+        topic: { type: 'string', enum: TOPIC_IDS, description: 'The topic it was about, if one fits' },
+        misconception: { type: 'string', description: 'The id of a live misconception this bears on, if any' },
         note: { type: 'string', description: 'What you observed (short)' }
       },
-      required: ['skill', 'outcome', 'difficulty']
+      required: ['skill', 'outcome', 'difficulty', 'reason', 'transfer']
     },
     activity: (a) => `Updating progress (${a.skill})`,
     async run(a, ctx) {
@@ -130,18 +139,49 @@ export default defineTools([
       if (ctx.autoRecorded?.(id)) {
         throw new Error(`The app already recorded ${id} from that graded answer (see [Learner memory]). Use record_evidence only for things the app can't grade: explanations, reasoning, questions they ask.`)
       }
+      if (!['right', 'partial', 'wrong', 'none'].includes(a.reason)) throw new Error('Give "reason": right, partial, wrong or none (the reason they gave for it).')
+      if (typeof a.transfer !== 'boolean') throw new Error('Give "transfer": true if this was in a new situation (different from where they learned it or got it wrong), else false.')
       requireObservation(ctx, id)
       const d = ([1, 2, 3].includes(Number(a.difficulty)) ? Number(a.difficulty) : 2) as 1 | 2 | 3
+      const topic = TOPIC_IDS.includes(a.topic) && topicDef(a.topic)?.skill === id ? (a.topic as TopicId) : undefined
+      const session = ctx.session()?.id ?? 'none'
+      const now = new Date().toISOString()
       let before = 0, after = 0
+      const signoff: string[] = []
       await ctx.updateProfile((p) => {
         before = p.skills[id].mastery
         // Judgement from a conversation the tutor steers: half weight, and never past JUDGEMENT_CAP.
         // ...and it adds no confidence: only graded answers should narrow the estimate.
         const next = applyEvidence(p.skills[id], a.outcome as Outcome, d, a.note ? `tutor: ${a.note}` : 'tutor', { weight: 0.5, cap: JUDGEMENT_CAP, trust: 0 })
         after = next.mastery
-        return { ...p, skills: { ...p.skills, [id]: next } }
+        const live = p.misconceptions.find((m) => m.id === a.misconception)
+        const ob: Observation = {
+          at: now, session, skill: id, ...(topic ? { topic } : {}), ...(live ? { misconception: live.id } : {}),
+          outcome: a.outcome, reason: a.reason, transfer: a.transfer, ...(a.note ? { note: String(a.note).slice(0, 120) } : {})
+        }
+        const q: typeof p = { ...p, skills: { ...p.skills, [id]: next }, observations: [...(p.observations ?? []), ob].slice(-150) }
+        // The misconceptions it bears on: does this evidence clear them? (Never in the lesson they appeared.)
+        const track = trackOf(p)
+        return {
+          ...q,
+          misconceptions: q.misconceptions.map((m) => {
+            const bears = m.id === ob.misconception || (!!topic && inferTopic(m) === topic)
+            if (!bears || m.resolved || ob.outcome === 'incorrect') return m
+            if ((m.sessions ?? []).includes(session)) {
+              signoff.push(`"${m.description}": doesn't count toward clearing it (same lesson it appeared in)`)
+              return m
+            }
+            const so = misconceptionSignOff(q, m, track)
+            if (so.status === 'cleared' || so.status === 'confirmed') {
+              signoff.push(`"${m.description}": cleared, provisionally (${so.why}); say so and check it again in a later lesson, don't call it fixed`)
+              return { ...m, resolved: true, resolvedAt: now }
+            }
+            signoff.push(`"${m.description}": ${SIGNOFF_WORDS[so.status]} (evidence ${so.points} of ${so.required}); still needs ${so.needed}`)
+            return m
+          })
+        }
       })
-      return { skill: id, mastery_before: before, mastery_after: after }
+      return { skill: id, mastery_before: before, mastery_after: after, ...(signoff.length ? { misconceptions: signoff.join('; ') } : {}) }
     }
   },
   {
@@ -200,24 +240,38 @@ export default defineTools([
         const existing = p.misconceptions.find((m) => (topic && inferTopic(m) === topic) || m.description.trim().toLowerCase() === key)
         if (existing) {
           count = existing.count + 1
-          return { ...p, misconceptions: p.misconceptions.map((m) => (m === existing ? { ...m, count, lastSeen: now, resolved: false, resolvedAt: undefined, description: String(a.description), topic: topic ?? m.topic } : m)) }
+          const session = ctx.session()?.id
+          return {
+            ...p,
+            misconceptions: p.misconceptions.map((m) => (m === existing
+              ? {
+                  ...m, count, lastSeen: now, resolved: false, resolvedAt: undefined, description: String(a.description), topic: topic ?? m.topic,
+                  ...(session && !(m.sessions ?? []).includes(session) ? { sessions: [...(m.sessions ?? []), session].slice(-8) } : {}),
+                  ...(m.resolved ? { relapses: (m.relapses ?? 0) + 1 } : {})
+                }
+              : m))
+          }
         }
         return {
           ...p,
-          misconceptions: [...p.misconceptions, { id: `mc_${Date.now().toString(36)}`, skill: id, ...(topic ? { topic } : {}), description: a.description, count: 1, firstSeen: now, lastSeen: now, resolved: false }]
+          misconceptions: [...p.misconceptions, { id: `mc_${Date.now().toString(36)}`, skill: id, ...(topic ? { topic } : {}), description: a.description, count: 1, firstSeen: now, lastSeen: now, resolved: false, ...(ctx.session()?.id ? { sessions: [ctx.session()!.id] } : {}) }]
         }
       })
-      return { recorded: true, times_seen: count, ...(topic ? { closes_automatically: 'after right graded answers on this topic in two separate lessons' } : {}), ...(news.length ? { pattern: news.join(' ') } : {}) }
+      return { recorded: true, times_seen: count, ...(topic ? { clears_automatically: 'from right answers in later lessons (never this one), against a bar set by this learner\'s record and how deep it is: the app decides, so don\'t tell them it\'s fixed' } : {}), ...(news.length ? { pattern: news.join(' ') } : {}) }
     }
   },
   {
     name: 'resolve_misconception',
-    description: 'Mark a misconception as resolved once the learner has clearly overcome it (e.g. correct twice in different contexts).',
-    parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-    activity: () => 'Marking a misconception resolved',
+    description: 'Remove a misconception that was recorded by mistake: it was never theirs (a misread answer, a slip of the mouse, a typo). Not for one they have overcome: the app clears those from evidence in later lessons (graded answers, and your record_evidence with reason and transfer), so record that evidence instead.',
+    parameters: { type: 'object', properties: { id: { type: 'string' }, why: { type: 'string', description: 'Why it was recorded by mistake' } }, required: ['id', 'why'] },
+    activity: () => 'Removing a misconception recorded by mistake',
     async run(a, ctx) {
-      await ctx.updateProfile((p) => ({ ...p, misconceptions: p.misconceptions.map((m) => (m.id === a.id ? { ...m, resolved: true } : m)) }))
-      return 'Resolved.'
+      const why = String(a.why ?? '').trim()
+      if (!why) throw new Error('Say why it was recorded by mistake. If they have overcome it, don\'t remove it: record_evidence (with reason and transfer) in a later lesson, and the app clears it.')
+      const m = ctx.profile().misconceptions.find((x) => x.id === a.id)
+      if (!m) throw new Error(`No misconception with id "${a.id}".`)
+      await ctx.updateProfile((p) => ({ ...p, misconceptions: p.misconceptions.filter((x) => x.id !== a.id) }))
+      return `Removed "${m.description}" (recorded by mistake: ${why.slice(0, 100)}).`
     }
   },
   {

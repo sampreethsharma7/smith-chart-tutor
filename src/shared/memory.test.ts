@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createProfile, migrateProfile, type Profile } from './profile'
 import {
-  aimFor, classifyLocate, classifyMatch, classifyMove, classifyReach, classifyValue, forgetNote, learnerBrief,
+  aimFor, classifyLocate, classifyMatch, classifyMove, classifyReach, classifyValue, forgetNote, learnerBrief, misconceptionSignOff,
   inferTopic, noteAsked, NOTES_PER_CATEGORY, recordGraded, REVIEW_DAYS, saveNote, startLevel, topicDef, type GradedMeta, type TopicId
 } from './memory'
 
@@ -97,19 +97,28 @@ describe('recording a graded answer', () => {
     expect(p.misconceptions[0]).toMatchObject({ topic: 'dir_shuntC', count: 2, resolved: false })
   })
 
-  it('closes it only after right answers in two separate lessons, and reopens it on a slip', () => {
+  it('never clears in the lesson it appeared; looking better, then cleared, then confirmed; a slip brings it back with a higher bar', () => {
     let p = learner()
     const m = classifyMove('shuntC', 'path')
     p = answer(p, m, false, 's1', at(0), 'Thinks a shunt C turns counter-clockwise').profile
-    p = answer(p, m, true, 's1', at(0, 10)).profile
-    p = answer(p, m, true, 's1', at(0, 20)).profile
-    expect(p.misconceptions[0].resolved).toBe(false) // same lesson twice isn't enough: could be short-term
-    const r = answer(p, m, true, 's2', at(2))
-    expect(r.profile.misconceptions[0].resolved).toBe(true)
-    expect(r.report).toMatch(/misconception resolved/)
-    const slip = answer(r.profile, m, false, 's3', at(9))
-    expect(slip.profile.misconceptions[0]).toMatchObject({ resolved: false, count: 2 })
-    expect(slip.report).toMatch(/misconception back/)
+    const same = answer(p, m, true, 's1', at(0, 10))
+    expect(same.report).toMatch(/doesn't count toward clearing it \(same lesson it appeared in/)
+    p = answer(same.profile, m, true, 's1', at(0, 20)).profile
+    expect(misconceptionSignOff(p, p.misconceptions[0])).toMatchObject({ status: 'active', points: 0 }) // right twice, minutes after: followed, not fixed
+    const r2 = answer(p, m, true, 's2', at(2))
+    expect(r2.profile.misconceptions[0].resolved).toBe(false)
+    expect(r2.report).toMatch(/looking better \(evidence 1 of 2;.*Say it's looking better, not fixed/)
+    const r3 = answer(r2.profile, m, true, 's3', at(4))
+    expect(r3.profile.misconceptions[0].resolved).toBe(true)
+    expect(r3.report).toMatch(/misconception cleared, provisionally.*don't call it fixed/)
+    expect(misconceptionSignOff(r3.profile, r3.profile.misconceptions[0]).status).toBe('cleared')
+    const r4 = answer(r3.profile, m, true, 's4', at(6))
+    expect(r4.report).toMatch(/misconception confirmed gone/)
+    expect(misconceptionSignOff(r4.profile, r4.profile.misconceptions[0]).status).toBe('confirmed')
+    const slip = answer(r4.profile, m, false, 's5', at(9))
+    expect(slip.profile.misconceptions[0]).toMatchObject({ resolved: false, count: 2, relapses: 1 })
+    expect(slip.report).toMatch(/misconception back.*the bar to clear it again is higher/)
+    expect(misconceptionSignOff(slip.profile, slip.profile.misconceptions[0]).required).toBeGreaterThan(2)
   })
 
   it('a misconception the tutor logged against a topic is closed the same way', () => {
@@ -194,7 +203,8 @@ describe('the brief the tutor plans from', () => {
     expect(p.asked).toHaveLength(20)
     expect(p.notes!.length).toBeLessThanOrEqual(5 * NOTES_PER_CATEGORY)
     const b = learnerBrief(p, at(50))
-    expect(b.text.length).toBeLessThan(6000)
+    // Bounded however long the history (each misconception also carries its sign-off status and score).
+    expect(b.text.length).toBeLessThan(6500)
     expect(JSON.stringify(p.topics).length).toBeLessThan(8000)
   })
 })

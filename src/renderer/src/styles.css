@@ -256,11 +256,12 @@ main.scroll { flex: 1; overflow: auto; }
 .sj-verdict.over { color: var(--warn); }
 .sj-verdict.unknown { color: var(--muted); }
 .pattern { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
-.pattern.fading { border-left-color: var(--accent); }
-.pattern.gone { border-left-color: var(--ok); opacity: 0.75; }
+.pattern.improving { border-left-color: var(--accent); }
+.pattern.cleared { border-left-color: var(--ok); }
+.pattern.confirmed { border-left-color: var(--ok); opacity: 0.75; }
 .pattern-status.active { border-color: var(--warn); color: var(--warn); }
-.pattern-status.fading { border-color: var(--accent); color: var(--accent); }
-.pattern-status.gone { border-color: var(--ok); color: var(--ok); }
+.pattern-status.improving { border-color: var(--accent); color: var(--accent); }
+.pattern-status.cleared, .pattern-status.confirmed { border-color: var(--ok); color: var(--ok); }
 .pattern-evidence { margin: 2px 0 0; }
 /* Topics under a skill on Progress */
 .topic-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px; }

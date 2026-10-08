@@ -2,6 +2,7 @@
 import type { Answer, Question } from './assessment'
 import type { AskedItem, Note, TopicId, TopicStat } from './memory'
 import type { Slip } from './patterns'
+import type { Observation } from './signoff'
 
 export type SkillId =
   | 'chart_basics'
@@ -61,6 +62,12 @@ export interface Misconception {
   resolvedAt?: string
   /** They were sure of the wrong answer: a real mental model to undo, not a slip */
   confident?: boolean
+  /** Lessons it was seen in (newest last): right answers in these never clear it */
+  sessions?: string[]
+  /** Situations (graded contexts) it was seen in, to tell when a right answer is in a new one */
+  ctxs?: string[]
+  /** Times it came back after being cleared: raises the bar for clearing it again (signoff.ts) */
+  relapses?: number
 }
 
 export interface SessionRecord {
@@ -185,6 +192,8 @@ export interface Profile {
   slips?: Slip[]
   /** How sure they said they were on graded questions, and whether they were right (newest last) */
   calibration?: Array<{ sure: Sure; right: boolean; at: string; topic?: TopicId }>
+  /** The tutor's structured observations of what the app can't grade: the reason they gave, and transfer (signoff.ts) */
+  observations?: Observation[]
   /** Scoring version the skills were last brought up to (see rescore) */
   scoring?: number
   /**

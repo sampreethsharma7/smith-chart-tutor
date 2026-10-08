@@ -80,7 +80,7 @@ describe('learner model regressions', () => {
     p = recordGraded(p, res({ meta: { topic: 'plot_y', skill: 'admittance', difficulty: 2, ctx: 'x' }, session: 'L2', at: AT(1, 2) })).profile
     expect(patternsOf(p)[0].status).toBe('active')
     p = recordGraded(p, res({ meta: { topic: 'plot_y', skill: 'admittance', difficulty: 2, ctx: 'y' }, session: 'L3', at: AT(5) })).profile
-    expect(patternsOf(p)[0].status).toBe('fading')
+    expect(patternsOf(p)[0].status).toBe('improving')
   })
 
   it('skills missing from an old file start from the learner\'s stated experience', () => {

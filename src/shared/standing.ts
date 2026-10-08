@@ -13,7 +13,7 @@ import { SKILLS, skillName, type Profile, type SkillId } from './profile'
 import { meetsProof, PROOF, recentScore, topicState, TOPICS, type TopicId, type TopicState, type TopicStat } from './memory'
 
 export { PROOF }
-import { patternsOf } from './patterns'
+import { isLive, patternsOf } from './patterns'
 
 export type { TopicState }
 
@@ -96,7 +96,7 @@ export const measured = (s: { evidence: number; confidence: number }) => s.evide
 export const spread = (confidence: number) => 0.3 * (1 - clamp(confidence))
 
 export function skillStanding(p: Profile, now: string): SkillStanding[] {
-  const live = patternsOf(p).filter((x) => x.status !== 'gone')
+  const live = patternsOf(p).filter(isLive)
   return SKILLS.map((s) => {
     const st = p.skills[s.id]
     const m = st.mastery

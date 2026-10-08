@@ -6,7 +6,7 @@
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-283%20passing-34d399">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-296%20passing-34d399">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a78bfa">
 </p>
 
@@ -96,7 +96,9 @@ The app knows every right answer exactly, so it can tell *how* an answer is wron
 - a value off by 2π means ω was forgotten
 - |Γ| given where VSWR was asked
 
-Each of these maps to one of 11 underlying confusions. When the same confusion turns up **in two topics or two lessons**, it becomes a *pattern*. The tutor names it with the evidence and teaches the root idea. The pattern fades as you answer cleanly in later lessons.
+Each of these maps to one of 11 underlying confusions. When the same confusion turns up **in two topics or two lessons**, it becomes a *pattern*. The tutor names it with the evidence and teaches the root idea.
+
+When is a mistake really fixed? The app judges it the way a good tutor would, not with one rule for everyone. Right answers in **later** lessons count (never the lesson the mistake appeared in), more when you were sure, gave the right reason, or did it in a new situation. The bar comes from your own record: lower if your fixes usually stick, higher for a mistake that keeps coming back. With little history, everyone starts at the same standard bar. A cleared mistake is re-checked once later before it counts as confirmed.
 
 <p align="center">
   <img src="docs/images/patterns.png" alt="Patterns the tutor has noticed: mixes up impedance and admittance, seen 3 times in 2 topics over 3 lessons" width="100%">
@@ -259,7 +261,7 @@ Commands:
 npm run dev         # development, with hot reload
 npm run build       # production build into out/
 npm start           # run the production build
-npm test            # 283 tests: RF engine, importers, grading, learner model, the agent loop end to end
+npm test            # 296 tests: RF engine, importers, grading, learner model, the agent loop end to end
 npm run typecheck
 ```
 

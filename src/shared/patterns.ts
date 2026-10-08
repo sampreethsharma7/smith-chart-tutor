@@ -11,8 +11,9 @@
 import { abs, c, conj, inv, sub, type Complex } from './rf/complex'
 import { gammaFromZ } from './rf/metrics'
 import { parseComplex, parseNumber, parsePartValue, type QuestionKey } from './rf/tasks'
-import { topicDef, type TopicId, type TopicStat } from './memory'
+import { topicDef, type TopicId } from './memory'
 import type { Profile } from './profile'
+import { gatherEvidence, signOff, SIGNOFF_WORDS, trackOf, type SignOff, type SignOffStatus } from './signoff'
 
 export const CONFUSIONS = {
   z_vs_y: {
@@ -237,52 +238,73 @@ const zOf = (g: Complex): Complex => {
 
 // ── Patterns: a confusion that keeps coming back ─────────────────────────────
 
-export type PatternStatus = 'active' | 'fading' | 'gone'
+export type PatternStatus = SignOffStatus
 
 export interface Pattern {
   confusion: Confusion
   name: string
   root: string
   probe: string
+  /** active (still there), improving, cleared (provisional, to re-check), confirmed: see signoff.ts */
   status: PatternStatus
   slips: Slip[]
   topics: TopicId[]
   lessons: number
   lastSeen: string
-  /** Lessons with clean right answers on its topics since it was last seen (2 = gone) */
-  clearLessons: number
+  /** Times it came back after being cleared */
+  relapses: number
+  /** The evidence since it was last seen, what this learner needs, and why */
+  signoff: SignOff
 }
+
+const qualifies = (mine: Slip[]) =>
+  mine.length >= 2 && (new Set(mine.map((s) => s.topic).filter(Boolean)).size >= 2 || new Set(mine.map((s) => s.session)).size >= 2)
 
 /**
  * A pattern is a confusion seen at least twice, in two different topics or two lessons
- * (once is a slip, not a pattern). It fades with clean right answers on its topics after
- * it was last seen, and is gone after two lessons of them; any new slip brings it back.
- * Derived from the record every time, so it can never drift out of date.
+ * (once is a slip, not a pattern). Whether it's gone is the adaptive sign-off (signoff.ts):
+ * right answers on its topics in later lessons (never one it appeared in), against a bar set by
+ * this learner's record and how deep the pattern is; a slip after it was cleared brings it back
+ * as a relapse, with a higher bar. Derived from the record every time, so it can never drift.
  */
 export function patternsOf(p: Profile): Pattern[] {
   const slips = p.slips ?? []
+  const track = trackOf(p)
   const out: Pattern[] = []
   for (const id of CONFUSION_IDS) {
-    const mine = slips.filter((s) => s.confusion === id)
-    if (mine.length < 2) continue
-    const topics = [...new Set(mine.map((s) => s.topic).filter((t): t is TopicId => !!t))]
-    const lessons = new Set(mine.map((s) => s.session)).size
-    if (topics.length < 2 && lessons < 2) continue
+    const mine = slips.filter((s) => s.confusion === id).sort((x, y) => x.at.localeCompare(y.at))
+    if (!qualifies(mine)) continue
     const def = CONFUSIONS[id]
-    const lastSeen = mine.reduce((a, s) => (s.at > a ? s.at : a), '')
-    const watch = new Set<TopicId>([...def.topics, ...topics])
-    const slipLessons = new Set(mine.map((s) => s.session))
-    const clean = [...watch].flatMap((t) => (p.topics?.[t] as TopicStat | undefined)?.rightIn ?? []).filter((e) => e.at > lastSeen && !slipLessons.has(e.session))
-    const clearLessons = new Set(clean.map((e) => e.session)).size
-    out.push({
-      confusion: id, name: def.name, root: def.root, probe: def.probe,
-      status: clearLessons >= 2 ? 'gone' : clearLessons === 1 ? 'fading' : 'active',
-      slips: mine, topics, lessons, lastSeen, clearLessons
-    })
+    const judge = (seen: Slip[], before?: string) => {
+      const topics = new Set(seen.map((s) => s.topic).filter((t): t is TopicId => !!t))
+      const lastSeen = seen[seen.length - 1].at
+      const evidence = gatherEvidence(p, {
+        topics: [...new Set<TopicId>([...def.topics, ...topics])], after: lastSeen,
+        exclude: new Set(seen.map((s) => s.session)),
+        seenCtx: new Set(seen.map((s) => s.ctx).filter((c): c is string => !!c)), seenTopics: topics
+      }).filter((e) => !before || e.at < before)
+      return { evidence, topics, lastSeen }
+    }
+    // Replay: each slip that arrived while the pattern stood cleared is a relapse.
+    let relapses = 0
+    for (let k = 2; k < mine.length; k++) {
+      const seen = mine.slice(0, k)
+      if (!qualifies(seen)) continue
+      const { evidence } = judge(seen, mine[k].at)
+      const st = signOff(evidence, track, { count: seen.length, lessons: new Set(seen.map((s) => s.session)).size, relapses }).status
+      if (st === 'cleared' || st === 'confirmed') relapses++
+    }
+    const { evidence, topics, lastSeen } = judge(mine)
+    const lessons = new Set(mine.map((s) => s.session)).size
+    const so = signOff(evidence, track, { count: mine.length, lessons, relapses })
+    out.push({ confusion: id, name: def.name, root: def.root, probe: def.probe, status: so.status, slips: mine, topics: [...topics], lessons, lastSeen, relapses, signoff: so })
   }
-  const rank = { active: 0, fading: 1, gone: 2 }
+  const rank: Record<PatternStatus, number> = { active: 0, improving: 1, cleared: 2, confirmed: 3 }
   return out.sort((a, b) => rank[a.status] - rank[b.status] || b.slips.length - a.slips.length || b.lastSeen.localeCompare(a.lastSeen))
 }
+
+/** Still to work on: not yet cleared. */
+export const isLive = (x: Pattern) => x.status === 'active' || x.status === 'improving'
 
 /** Add slips to the record (bounded: the oldest go first). */
 export function addSlips(p: Profile, found: SlipFinding[], where: { at: string; session: string; topic?: TopicId; ctx?: string; source?: Slip['source'] }): Profile {
@@ -301,9 +323,14 @@ export function patternNews(before: Profile, after: Profile): string[] {
 
 /** Patterns, for the tutor's brief: active and fading ones, with the evidence and how to check. */
 export function patternsBrief(p: Profile): string {
-  const live = patternsOf(p).filter((x) => x.status !== 'gone').slice(0, 4)
-  if (!live.length) return ''
-  return `Patterns (the same confusion across topics or lessons; work on these first): ${live.map((x) =>
-    `${x.confusion} [${x.status}${x.status === 'fading' ? ': one more lesson of clean answers clears it' : ''}] ${x.name}; seen ${x.slips.length}× (${x.slips.slice(-3).map((s) => `${s.topic ? topicDef(s.topic)?.name ?? s.topic : 'conversation'}: ${s.detail}`).join('; ')}). Check it with: ${x.probe}`
-  ).join(' | ')}`
+  const all = patternsOf(p)
+  const live = all.filter(isLive).slice(0, 4)
+  const recheck = all.filter((x) => x.status === 'cleared').slice(0, 2)
+  if (!live.length && !recheck.length) return ''
+  return [
+    live.length ? `Patterns (the same confusion across topics or lessons; work on these first): ${live.map((x) =>
+      `${x.confusion} [${SIGNOFF_WORDS[x.status]}, ${x.signoff.points}/${x.signoff.required}] ${x.name}; seen ${x.slips.length}×${x.relapses ? `, back ${x.relapses}× after clearing` : ''} (${x.slips.slice(-3).map((s) => `${s.topic ? topicDef(s.topic)?.name ?? s.topic : 'conversation'}: ${s.detail}`).join('; ')}). Check it with: ${x.probe}`
+    ).join(' | ')}` : '',
+    recheck.length ? `Patterns cleared, to re-check once in a later lesson: ${recheck.map((x) => `${x.confusion} (${x.name}); check with: ${x.probe}`).join(' | ')}` : ''
+  ].filter(Boolean).join('\n')
 }
