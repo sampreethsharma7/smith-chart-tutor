@@ -112,6 +112,20 @@ SMITH_PROBE="Claude Sonnet 5.5" SMITH_PROMPT="Say hi" npx electron .
 node scripts/export-reference.mjs "%APPDATA%/smith-tutor/data/settings.json"
 ```
 
+## Design tab: matching your own loads
+
+**Learn** is for lessons. **Design** is for real work: an assistant that matches your load with you, like a colleague. It uses the same model as the tutor.
+
+- **Its own chart.** Design has its own chart, separate from the lesson's, so a lesson exercise and your real design never overwrite each other. Import your `.s1p` or CST file on the left, or set up a load.
+- **It does the work.** Tell it what you need, for example "match to 50 Ω at 2.45 GHz, VSWR under 2 from 2.4 to 2.5 GHz". It works out the lumped L-networks and single-stub matches, checks each one across the band, and shows 2–3 as cards: parts, VSWR and return loss at the design frequency, the worst VSWR in your band, the matched bandwidth, a one-line trade-off and its recommendation. Every number is computed by the app, not the model.
+- **You decide.** Nothing changes on your chart until you press **Apply** on a card (or ask it to apply one). **Undo** puts your previous network back.
+- **Pitched to you.** It explains as much as your profile suggests: terse for someone advanced, a sentence on each part for someone newer.
+- **Not graded.** Nothing in the Design tab counts as answers, mistakes or progress.
+- **Teach me why.** Opens a tutor lesson on a copy of the design (the Design tab keeps its own), and the tutor takes it apart step by step. If a lesson is already open, the design is brought into it.
+- **Limits for now:** ideal parts (no tolerance, loss or self-resonance, no snapping to standard values), and L-networks and single stubs only. It can check any other network you describe.
+
+While either assistant is replying, the other tab is locked, because its tools act on the chart that's loaded.
+
 ## CST / measured data
 
 - **Best:** in CST, *Post-Processing → Import/Export → Touchstone* → `.s1p` / `.s2p` (S11 is used; S22 can be selected in code).
@@ -303,6 +317,7 @@ Everything saves automatically, per profile, and survives tab switches, profile 
 | Placement test in progress | after every answer; resume from Placement test or the Get started bar | `profiles/<id>.json` |
 | Chart setup, exercise card, prediction card, the tutor's drawings | as you change them | `workspaces/<id>.json` |
 | Live tutor conversation | while you talk; restored on the next launch | `conversations/<id>.json` |
+| Design tab chart and assistant chat | as you change them | `design/<id>.workspace.json`, `design/<id>.chat.json` |
 | Session transcript and exercises | after every turn | `profiles/<id>.json` |
 
 Ending a lesson (by reaching the goal or finishing early) writes a summary for the tutor's memory. Lessons you never ended are summarised automatically when you next start one.

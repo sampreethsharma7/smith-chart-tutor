@@ -115,6 +115,8 @@ function registerIpc() {
   ipcMain.handle('workspace:save', (_e, id: string, ws: unknown) => store.saveWorkspace(id, ws))
   ipcMain.handle('conversation:get', (_e, id: string) => store.getConversation(id))
   ipcMain.handle('conversation:save', (_e, id: string, c: unknown) => store.saveConversation(id, c))
+  ipcMain.handle('design:get', (_e, id: string, part: string) => store.getDesign(id, part))
+  ipcMain.handle('design:save', (_e, id: string, part: string, data: unknown) => store.saveDesign(id, part, data))
 
   ipcMain.handle('files:openData', async () => {
     const r = await dialog.showOpenDialog(win!, {

@@ -22,6 +22,7 @@ vi.mock('@/state/app', async () => {
   return {
     activeProvider: () => ({ id: 'fake', label: 'Fake model', supportsTools: true }),
     useApp: { getState: () => state, subscribe: () => () => {} },
+    registerBusy: () => {},
     api: () => ({
       llm: {
         chat: (req: ChatRequest) => {

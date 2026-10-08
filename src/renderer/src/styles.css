@@ -641,3 +641,17 @@ button.big { padding: 8px 12px; font-size: 14px; }
 .tsq.top { background: var(--target); border-color: var(--target); }
 .tsq.due::after { content: '↻'; position: absolute; top: -9px; right: -6px; font-size: 10px; color: var(--text); font-weight: 700; }
 .stand-legend .tsq { width: 11px; height: 11px; cursor: default; }
+
+/* Design tab */
+.design-intro { display: flex; flex-direction: column; gap: 6px; padding: 4px 2px; }
+.design-intro p { margin: 0; }
+.design-starters { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.design-starters button { text-align: left; }
+.card.design-options { max-height: 45%; overflow-y: auto; flex-shrink: 0; }
+.design-option { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+.design-option.recommended { border-color: var(--accent); }
+.design-option.applied { border-color: var(--ok); }
+.design-option .row { gap: 6px; }
+.tutor.design .tutor-head { gap: 8px; }
+.tutor.design .tutor-head > div:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor.design .tutor-head button { white-space: nowrap; }

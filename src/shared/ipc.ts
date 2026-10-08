@@ -21,6 +21,8 @@ export interface OpenedFile {
 }
 
 /** The API exposed on `window.api` by the preload script. */
+export type DesignPart = 'workspace' | 'chat'
+
 export interface DesktopApi {
   settings: {
     get(): Promise<AppSettings>
@@ -52,6 +54,11 @@ export interface DesktopApi {
   conversation: {
     get(profileId: string): Promise<unknown>
     save(profileId: string, c: unknown): Promise<void>
+  }
+  /** The Design tab, per profile: its own chart ("workspace") and assistant chat ("chat"); null clears one */
+  design: {
+    get(profileId: string, part: DesignPart): Promise<unknown>
+    save(profileId: string, part: DesignPart, data: unknown): Promise<void>
   }
   files: {
     openData(): Promise<OpenedFile[]>

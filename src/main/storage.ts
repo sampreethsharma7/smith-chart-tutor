@@ -9,6 +9,7 @@ const root = () => join(app.getPath('userData'), 'data')
 const profilesDir = () => join(root(), 'profiles')
 const workspaceDir = () => join(root(), 'workspaces')
 const tutorDir = () => join(root(), 'conversations')
+const designDir = () => join(root(), 'design')
 
 async function readJson<T>(path: string, fallback: T): Promise<T> {
   try {
@@ -61,7 +62,7 @@ function writeJson(path: string, data: unknown): Promise<void> {
 export async function cleanUpTempFiles(): Promise<{ removed: number; recovered: string[] }> {
   const out = { removed: 0, recovered: [] as string[] }
   const tmpName = /^(.+\.json)(?:\.\d+\.\d+)?\.tmp$/
-  for (const dir of [root(), profilesDir(), workspaceDir(), tutorDir()]) {
+  for (const dir of [root(), profilesDir(), workspaceDir(), tutorDir(), designDir()]) {
     let names: string[]
     try {
       names = await fs.readdir(dir)
@@ -230,6 +231,7 @@ export async function deleteProfile(id: string) {
   await fs.rm(join(profilesDir(), `${safeId(id)}.json`), { force: true })
   await fs.rm(join(workspaceDir(), `${safeId(id)}.json`), { force: true })
   await fs.rm(join(tutorDir(), `${safeId(id)}.json`), { force: true })
+  for (const part of DESIGN_PARTS) await fs.rm(designFile(id, part), { force: true })
 }
 
 // ---- per-profile chart workspace -------------------------------------------
@@ -253,6 +255,24 @@ export async function saveConversation(profileId: string, c: unknown) {
   if (deleted.has(safeId(profileId))) return
   if (c === null) await fs.rm(join(tutorDir(), `${safeId(profileId)}.json`), { force: true })
   else await writeJson(join(tutorDir(), `${safeId(profileId)}.json`), c)
+}
+
+// ---- per-profile Design tab: its own chart and assistant chat -----------------
+
+const DESIGN_PARTS = ['workspace', 'chat']
+function designFile(profileId: string, part: string) {
+  if (!DESIGN_PARTS.includes(part)) throw new Error(`Unknown design part "${part}"`)
+  return join(designDir(), `${safeId(profileId)}.${part}.json`)
+}
+
+export async function getDesign(profileId: string, part: string): Promise<unknown> {
+  return readJson(designFile(profileId, part), null)
+}
+
+export async function saveDesign(profileId: string, part: string, data: unknown) {
+  if (deleted.has(safeId(profileId))) return
+  if (data === null) await fs.rm(designFile(profileId, part), { force: true })
+  else await writeJson(designFile(profileId, part), data)
 }
 
 export const dataFolder = root

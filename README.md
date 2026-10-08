@@ -6,7 +6,7 @@
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-302%20passing-34d399">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-317%20passing-34d399">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a78bfa">
 </p>
 
@@ -35,6 +35,9 @@ Smith Chart Tutor combines the two.
 
 ### 🧭 Lessons with a goal, not a chat log
 Each lesson has one goal and a short checklist of steps. The tutor follows **predict → act → verify**: before you add an element, it asks what will happen. Then you try it on the chart and talk about the gap. It escalates help step by step, from a guiding question to a pointer on the chart to a hint to a worked step, and doesn't hand out answers.
+
+### 🛠️ A Design tab for real work
+When you just need a load matched, the **Design** tab has an assistant that does it with you, on its own chart. Import your measured data and say what you need. It works out the L-network and single-stub matches, checks each across your band, and shows the best 2–3 as cards with exact numbers and a recommendation. You apply one with a click, and Undo puts things back. Nothing there is graded. **Teach me why** opens a tutor lesson on that design.
 
 ### ✅ Questions that are graded exactly, and hard to bluff
 The tutor designs its own questions, and the app works out the right answer for each:

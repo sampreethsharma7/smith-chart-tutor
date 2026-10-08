@@ -97,7 +97,7 @@ export function TutorPanel() {
 const SHOWN = 150
 
 /** One chat message. Memoised: while a reply streams in, only that message re-renders. */
-const Message = memo(function Message({ it }: { it: DisplayItem }) {
+export const Message = memo(function Message({ it }: { it: DisplayItem }) {
   return (
     <div className={`msg ${it.kind}`} title={it.model ? `Written by ${it.model}` : undefined}>
       {it.kind === 'tutor' ? (
@@ -183,7 +183,7 @@ const CHART_GAP = 24
  * area, so while that area is wider than tall (plus a gap), the chart keeps
  * its size. Double-click resets. The width is remembered on this computer.
  */
-function ResizeHandle({ aside }: { aside: React.RefObject<HTMLElement | null> }) {
+export function ResizeHandle({ aside }: { aside: React.RefObject<HTMLElement | null> }) {
   const [dragging, setDragging] = useState(false)
 
   const grid = () => aside.current?.parentElement ?? null

@@ -54,7 +54,8 @@ export async function startLesson(focus?: LessonFocus) {
     app.setView('models')
     return
   }
-  app.setView('studio')
+  await app.setView('studio')
+  if (useApp.getState().view !== 'studio') return // an assistant is mid-reply on the other chart
   const t = useTutor.getState()
   if (t.busy) return
   if (t.history.length) {

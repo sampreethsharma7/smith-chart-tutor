@@ -43,6 +43,10 @@ const api: DesktopApi = {
     get: (id) => ipcRenderer.invoke('conversation:get', id),
     save: (id, c) => ipcRenderer.invoke('conversation:save', id, c)
   },
+  design: {
+    get: (id, part) => ipcRenderer.invoke('design:get', id, part),
+    save: (id, part, data) => ipcRenderer.invoke('design:save', id, part, data)
+  },
   files: {
     openData: () => ipcRenderer.invoke('files:openData'),
     openDataFolder: () => ipcRenderer.invoke('files:openDataFolder')

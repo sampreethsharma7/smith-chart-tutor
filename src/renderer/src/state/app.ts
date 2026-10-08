@@ -13,7 +13,18 @@ declare global {
 }
 export const api = () => window.api
 
-export type View = 'studio' | 'assessment' | 'progress' | 'models' | 'profiles'
+export type View = 'studio' | 'design' | 'assessment' | 'progress' | 'models' | 'profiles'
+
+/** Which chart is loaded: the lesson's (Learn) or the Design tab's. Each profile has one of each. */
+export type ChartMode = 'lesson' | 'design'
+let chartMode: ChartMode = 'lesson'
+export const currentChartMode = () => chartMode
+/** The chart a view shows; views without a chart keep whichever is loaded. */
+/** Assistants working on the loaded chart (tutor, design assistant): the chart can't be swapped under them. */
+const busyChecks: Array<() => boolean> = []
+export const registerBusy = (check: () => boolean) => { busyChecks.push(check) }
+export const agentBusy = () => busyChecks.some((f) => f())
+export const chartModeOf = (v: View): ChartMode | null => (v === 'design' ? 'design' : v === 'studio' ? 'lesson' : null)
 
 interface AppState {
   ready: boolean
@@ -22,7 +33,8 @@ interface AppState {
   profiles: Profile[]
   profile: Profile | null
   init(): Promise<void>
-  setView(v: View): void
+  /** Switching between Learn and Design also swaps the chart (resolves once it's loaded) */
+  setView(v: View): Promise<void>
   // models
   saveProviders(providers: ProviderConfig[], activeId?: string | null): Promise<void>
   /** Save connections and/or models together (keeps the active model valid) */
@@ -67,7 +79,15 @@ export const useApp = create<AppState>((set, get) => ({
     return (initOnce ??= doInit())
   },
 
-  setView(view) {
+  async setView(view) {
+    const mode = chartModeOf(view)
+    if (mode && mode !== chartMode) {
+      if (agentBusy()) return // its tools act on the chart that's loaded
+      await flushWorkspace()
+      chartMode = mode
+      const p = get().profile
+      if (p) await loadWorkspace(p)
+    }
     set({ view })
   },
 
@@ -148,7 +168,9 @@ export function activeProvider(): ProviderConfig | undefined {
 // ---- workspace persistence (chart setup per profile) ------------------------
 
 async function loadWorkspace(p: Profile) {
-  const ws = (await api().workspace.get(p.id)) as Partial<StudioSnapshot> | null
+  const mode = chartMode
+  const ws = (mode === 'design' ? await api().design.get(p.id, 'workspace') : await api().workspace.get(p.id)) as Partial<StudioSnapshot> | null
+  if (mode !== chartMode) return // switched again meanwhile
   useStudio.getState().loadSnapshot(ws ?? { z0: p.preferences.defaultZ0 })
 }
 
@@ -156,7 +178,9 @@ export async function flushWorkspace() {
   const p = useApp.getState().profile
   if (!p) return
   clearTimeout(saveTimer)
-  await api().workspace.save(p.id, useStudio.getState().snapshot())
+  const snap = useStudio.getState().snapshot()
+  if (chartMode === 'design') await api().design.save(p.id, 'workspace', snap)
+  else await api().workspace.save(p.id, snap)
 }
 
 useStudio.subscribe((s, prev) => {

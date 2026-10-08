@@ -3,7 +3,7 @@ import type { ChatMessage, ChatRequest, ChatResult, Part, StreamEvent } from '@s
 import { textOf } from '@shared/llm'
 import { countsAsLesson, hasReviewMaterial, lessonsOf, masterySnapshot, skillName, type LessonFocus, type SessionRecord } from '@shared/profile'
 import { probeTargets, skillStanding } from '@shared/standing'
-import { activeProvider, api, useApp } from '@/state/app'
+import { activeProvider, api, registerBusy, useApp } from '@/state/app'
 import { useStudio } from '@/state/studio'
 import { useCalc } from '@/state/calc'
 import { computeDerived } from '@/state/derived'
@@ -114,7 +114,8 @@ interface TutorState {
   completing: boolean
   /** One-off message for the lesson card (e.g. an empty lesson was discarded) */
   notice: string | null
-  startSession(focus?: LessonFocus): Promise<void>
+  /** `design`: the learner came from the Design tab to understand that design (it's on the chart) */
+  startSession(focus?: LessonFocus, design?: string): Promise<void>
   endSession(): Promise<void>
   reset(): void
 }
@@ -193,6 +194,13 @@ function probeOpening(n: number): string {
     'Use the hardest-to-bluff kinds: ask_move with its reason, ask_locate, ask_value, ask_spot_error, and one create_target_task. Put each in a situation they have not been right in before (other half of the chart, other side of r = 1, another quantity). ' +
     'Start at their aim level; after a clean right answer go one level up, after a miss one down. Give no hints or explanations unless they ask; between questions one short line only. ' +
     'At the end, tell them plainly what held and what didn\'t, from the results (not impressions), then set_next_focus and complete_lesson. Open now: one line saying what this is, then the first question.'
+}
+
+/** A lesson on a design the learner brought from the Design tab. */
+export function designOpening(n: number, design: string): string {
+  return `[Lesson ${n} start] The learner comes from the Design tab, where the design assistant matched their load with them. That design is on the chart now: ${design}. ` +
+    'They want to understand why it works. Greet them in one line, call set_lesson_goal (the goal: understanding this design well enough to do it themselves; 2–3 steps), then start, building on their design: ' +
+    'take it apart one element at a time, and have them predict each move before you show it.'
 }
 
 function lessonOpening(n: number, focus?: LessonFocus, review = false): string {
@@ -647,7 +655,7 @@ export const useTutor = create<TutorState>((set, get) => {
       if (id) api().llm.abort(id)
     },
 
-    async startSession(focus) {
+    async startSession(focus, design) {
       if (get().history.length || get().busy) return
       const p = useApp.getState().profile
       const n = (p ? lessonsOf(p).length : 0) + 1
@@ -655,6 +663,10 @@ export const useTutor = create<TutorState>((set, get) => {
       const s = ensureSession()
       set({ session: { ...s, focus } })
       summarizeStaleSessions().catch(console.error)
+      if (design) {
+        await get().send(designOpening(n, design), { hidden: true, display: `Lesson ${n} started · your design` })
+        return
+      }
       const label = focus === 'own' ? 'your question' : focus === 'probe' ? 'check yourself' : focus ? skillName(focus) : "tutor's pick"
       // Only offered once there's something to review; never for "own question" or check-yourself lessons.
       const review = !!p?.preferences.reviewFirst && focus !== 'own' && focus !== 'probe' && !!p && hasReviewMaterial(p)
@@ -715,6 +727,8 @@ export const useTutor = create<TutorState>((set, get) => {
     }
   }
 })
+
+registerBusy(() => useTutor.getState().busy)
 
 // ---- persistence: one live conversation per profile -------------------------
 

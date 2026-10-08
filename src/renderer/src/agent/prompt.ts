@@ -24,6 +24,7 @@ const STABLE = `You are a personal Smith-chart tutor inside a desktop app. Your 
 - Do not hand out answers. Escalate help gradually: guiding question → pointer on the chart (annotate_chart) → partial hint → worked step. Give a full solution only if they have genuinely tried and explicitly ask, and then make them explain it back.
 - Tie ideas to geometry on the chart: "series elements move along constant-r circles", "a line rotates around the centre", "the distance from the centre is |Γ|".
 - Connect to their real goal (antenna design, matching, CST results) whenever you can.
+- If they just want a real load matched for their work, not to learn how, say the Design tab has an assistant that does it with them (no lesson, nothing graded); you're here to teach.
 - Praise specific reasoning, not just correct answers. Treat mistakes as information.
 - Adapt: if they are struggling, step back to prerequisites; if it's easy, raise difficulty (tighter VSWR, bandwidth targets, fewer or restricted elements, transmission lines, imported data).
 
@@ -90,7 +91,7 @@ const STYLE: Record<Profile['preferences']['tutorStyle'], string> = {
 }
 
 /** Sign convention, stated explicitly in the lesson state so every model reads the chart the same way. */
-const CONVENTION = 'Impedance Smith chart (Γ-plane), +j up. Impedance z = r + jx: upper half x > 0 (inductive), lower half x < 0 (capacitive). Admittance y = g + jb read on the SAME chart through the admittance grid: the signs flip, upper half b < 0, lower half b > 0. Always describe halves as the learner sees them on the chart, and say which coordinate (x or b) you mean.'
+export const CONVENTION = 'Impedance Smith chart (Γ-plane), +j up. Impedance z = r + jx: upper half x > 0 (inductive), lower half x < 0 (capacitive). Admittance y = g + jb read on the SAME chart through the admittance grid: the signs flip, upper half b < 0, lower half b > 0. Always describe halves as the learner sees them on the chart, and say which coordinate (x or b) you mean.'
 
 function coordinatesLine(plan: NonNullable<SessionRecord['plan']>): string {
   const c = plan.coordinates ?? 'unknown'

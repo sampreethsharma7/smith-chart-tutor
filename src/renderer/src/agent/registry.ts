@@ -8,27 +8,36 @@ export const TOOLS: AgentTool[] = Object.values(modules).flatMap((m) => m.defaul
 
 const byName = new Map(TOOLS.map((t) => [t.name, t]))
 
+export const specsOf = (tools: AgentTool[]): ToolSpec[] => tools.map(({ name, description, parameters }) => ({ name, description, parameters }))
+
 export function toolSpecs(): ToolSpec[] {
-  return TOOLS.map(({ name, description, parameters }) => ({ name, description, parameters }))
+  return specsOf(TOOLS)
 }
 
-export async function runTool(name: string, args: Record<string, unknown>, ctx: ToolContext): Promise<{ content: string; isError: boolean }> {
-  const tool = byName.get(name)
-  if (!tool) return { content: `Unknown tool "${name}". Available: ${[...byName.keys()].join(', ')}`, isError: true }
+/** One of the tutor's tools, to share with another assistant. */
+export const tutorTool = (name: string) => byName.get(name)
+
+export function runTool(name: string, args: Record<string, unknown>, ctx: ToolContext): Promise<{ content: string; isError: boolean }> {
+  // Addressed to the tutor only: weaker models otherwise repeat it to the learner.
+  return runToolIn(byName, name, args, ctx, "(Note for you, not the learner: don't mention this; just carry on teaching.)")
+}
+
+export async function runToolIn(tools: Map<string, AgentTool>, name: string, args: Record<string, unknown>, ctx: ToolContext, errorNote: string): Promise<{ content: string; isError: boolean }> {
+  const tool = tools.get(name)
+  if (!tool) return { content: `Unknown tool "${name}". Available: ${[...tools.keys()].join(', ')}`, isError: true }
   try {
     const out = await tool.run(coerce(tool.parameters, args ?? {}) as Record<string, unknown>, ctx)
     return { content: typeof out === 'string' ? out : JSON.stringify(out, roundNumbers), isError: false }
   } catch (e) {
-    // Addressed to the tutor only: weaker models otherwise repeat it to the learner.
-    return { content: `Error in ${name}: ${(e as Error).message} (Note for you, not the learner: don't mention this; just carry on teaching.)`, isError: true }
+    return { content: `Error in ${name}: ${(e as Error).message} ${errorNote}`, isError: true }
   }
 }
 
 /** Tools that hand the floor to the learner (e.g. an exercise or prediction card). */
 export const endsTurn = (name: string) => byName.get(name)?.endsTurn === true
 
-export function toolActivity(name: string, args: Record<string, unknown>): string {
-  const t = byName.get(name)
+export function toolActivity(name: string, args: Record<string, unknown>, tools: Map<string, AgentTool> = byName): string {
+  const t = tools.get(name)
   return t?.activity?.(args) ?? name.replace(/_/g, ' ')
 }
 
