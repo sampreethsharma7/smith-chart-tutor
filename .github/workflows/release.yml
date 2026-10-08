@@ -1,7 +1,7 @@
 # Builds the ready-made downloads (Windows installer + portable, Mac dmg/zip, Linux AppImage/deb).
 #
 #   Pushing a version tag, e.g.  git tag v0.1.0 && git push origin v0.1.0
-#   (the tag must match "version" in package.json), uploads them to a DRAFT release:
+#   (the tag must match "version" in package.json), puts them all in one DRAFT release:
 #   check it on the Releases page, then press "Publish release" to make it public.
 #
 #   Running it by hand (Actions → Release → Run workflow) only builds, and keeps the files as
@@ -13,30 +13,15 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
-permissions:
-  contents: write # to create the draft release and upload to it
-
 jobs:
-  # One draft first, so the three builds upload into the same release instead of racing to create one each.
-  draft:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create the draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
-            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --title "${GITHUB_REF_NAME#v}" --notes "Download the file for your computer: the [README](https://github.com/$GITHUB_REPOSITORY#getting-started) says which one, and what to click the first time."
-
   build:
-    needs: draft
-    if: ${{ !cancelled() && needs.draft.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -61,15 +46,12 @@ jobs:
 
       - run: npm run build
 
+      # Files only: the release job below collects all three systems into one draft
+      # (builds publishing on their own each make a separate draft).
       - name: Package
-        shell: bash
-        run: npx --yes electron-builder@26.15.3 --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --yes electron-builder@26.15.3 --publish never
 
-      - name: Keep the files (manual runs)
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: smith-chart-tutor-${{ runner.os }}
           path: |
@@ -79,3 +61,23 @@ jobs:
             release/*.AppImage
             release/*.deb
           if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to create the draft release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: One draft release with every download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/* -R "$GITHUB_REPOSITORY" --draft --title "${GITHUB_REF_NAME#v}" \
+            --notes "Download the file for your computer: the [README](https://github.com/$GITHUB_REPOSITORY#getting-started) says which one, and what to click the first time."
