@@ -47,6 +47,7 @@ mac:
       arch: [arm64, x64]
   category: public.app-category.education
   identity: '-' # ad-hoc: lets Apple Silicon run it; still unsigned for Gatekeeper ("Open Anyway")
+  hardenedRuntime: false # only needed for Apple notarization; with ad-hoc signing it can stop the app launching
 dmg:
   artifactName: Smith-Chart-Tutor-${version}-Mac-${arch}.${ext}
 
