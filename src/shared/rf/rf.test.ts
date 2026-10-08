@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { c, abs } from './complex'
 import { gammaFromZ, metricsFromZ, zFromGamma } from './metrics'
-import { computeTrace, inputImpedance, loadImpedance, sweepFreqs, traceBands, NetworkElement } from './network'
+import { computeTrace, inputImpedance, loadImpedance, nearestOnTrace, sweepFreqs, traceBands, NetworkElement } from './network'
 import { parseCstAscii, parseTouchstone, importFile } from './importers'
 
 const close = (a: number, b: number, tol = 1e-6) => expect(Math.abs(a - b)).toBeLessThan(tol)
@@ -84,6 +84,20 @@ describe('network', () => {
     const tr = computeTrace(load, [], sweepFreqs({ start: 0.8e9, stop: 1.2e9, points: 4001 }), 50)
     const [band] = traceBands(tr, 50, 2)
     close(band.fractional, 1 / (10 * Math.SQRT2), 2e-3)
+  })
+
+  it('hovering a trace reads its frequency, between samples too', () => {
+    // Three samples along the real axis: Γ = −0.5 at 1 GHz, 0 at 2 GHz, +0.5 at 3 GHz.
+    const pts = [{ f: 1e9, g: c(-0.5, 0) }, { f: 2e9, g: c(0, 0) }, { f: 3e9, g: c(0.5, 0) }]
+    const hit = nearestOnTrace(pts, c(0.25, 0.01), 0.05)!
+    close(hit.f, 2.5e9, 1e3) // halfway between the 2 and 3 GHz samples
+    close(hit.g.re, 0.25, 1e-12)
+    close(hit.g.im, 0, 1e-12)
+    expect(nearestOnTrace(pts, c(0.25, 0.2), 0.05)).toBeNull() // too far from the trace
+    expect(nearestOnTrace(pts, c(-0.6, 0), 0.2)!.f).toBe(1e9) // past the start: the start
+    // A gap in the trace (an infinite point) is skipped, not bridged.
+    const gap = [{ f: 1, g: c(0, 0) }, { f: 2, g: c(Infinity, 0) }, { f: 3, g: c(0.5, 0) }]
+    expect(nearestOnTrace(gap, c(0.25, 0), 0.1)).toBeNull()
   })
 })
 

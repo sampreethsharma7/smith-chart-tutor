@@ -215,6 +215,30 @@ export function computeTrace(
   })
 }
 
+/**
+ * The point of a sweep trace nearest to q (a cursor), if it's within tol: the frequency there
+ * and Γ, interpolated between the sweep's samples so the frequency reads finer than the sweep step.
+ * The chart has no frequency axis; this is how hovering a trace tells you its frequency.
+ */
+export function nearestOnTrace(points: Array<{ f: number; g: Complex }>, q: Complex, tol: number): { f: number; g: Complex } | null {
+  let best: { f: number; g: Complex; d: number } | null = null
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    if (!isFiniteC(a.g)) continue
+    const b = points[i + 1]
+    let t = 0
+    if (b && isFiniteC(b.g)) {
+      const ex = b.g.re - a.g.re, ey = b.g.im - a.g.im
+      const len2 = ex * ex + ey * ey
+      t = len2 > 0 ? Math.max(0, Math.min(1, ((q.re - a.g.re) * ex + (q.im - a.g.im) * ey) / len2)) : 0
+    }
+    const g = t > 0 && b ? lerp(a.g, b.g, t) : a.g
+    const d = Math.hypot(q.re - g.re, q.im - g.im)
+    if (d <= tol && (!best || d < best.d)) best = { f: t > 0 && b ? a.f + (b.f - a.f) * t : a.f, g, d }
+  }
+  return best && { f: best.f, g: best.g }
+}
+
 export interface Band {
   fLow: number
   fHigh: number

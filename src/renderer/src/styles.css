@@ -190,6 +190,10 @@ main.scroll { flex: 1; overflow: auto; }
 .trace.load { stroke: var(--trace-load); }
 .trace.input { stroke: var(--trace-input); }
 .trace-end.load { fill: var(--trace-load); }
+/* The trace point the hover tip is reading (snapped to the nearest trace) */
+.trace-snap { fill: none; stroke-width: 2.5; pointer-events: none; }
+.trace-snap.load { stroke: var(--trace-load); }
+.trace-snap.input { stroke: var(--trace-input); }
 .load-lbl { fill: var(--trace-load); }
 .path { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; }
 /* Arrowheads are drawn in chart units (they scale with dots and text) and stop at the dot they point to */
@@ -290,6 +294,7 @@ main.scroll { flex: 1; overflow: auto; }
   padding: 6px 8px; font-size: 11.5px; line-height: 1.5; box-shadow: 0 4px 14px rgba(0,0,0,0.25);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+.hover-tip .tip-head { font-weight: 700; margin-bottom: 2px; }
 .chart-legend { position: absolute; left: 10px; top: 8px; display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; color: var(--text-2); }
 .lg.load::first-letter { color: var(--trace-load); }
 .lg.input::first-letter { color: var(--trace-input); }

@@ -7,13 +7,17 @@ import { fmtC, fmtDb, fmtEng, fmtHz, fmtNum } from '@/lib/format'
 /** Full metric card for whatever the user is looking at: hover → pinned → design input. */
 export function InspectCard() {
   const hover = useHover((s) => s.gamma)
+  const snap = useHover((s) => s.snap)
   const pinned = useStudio((s) => s.pinned)
   const z0 = useStudio((s) => s.z0)
   const network = useStudio((s) => s.network)
   const d = useDerived()
   let title: string
   let m: PointMetrics
-  if (hover) {
+  if (hover && snap) {
+    title = `${snap.which === 'load' ? 'Load' : 'Input'} at ${fmtHz(snap.f, 4)}`
+    m = metricsFromGamma(snap.g, z0, snap.f)
+  } else if (hover) {
     title = 'Cursor'
     m = metricsFromGamma(hover, z0, d.design.f)
   } else if (pinned) {

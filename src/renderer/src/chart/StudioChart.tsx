@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { abs, type Complex } from '@shared/rf/complex'
 import { gammaFromZ, metricsFromGamma, zFromGamma } from '@shared/rf/metrics'
 import { admittanceOf, type Target } from '@shared/rf/tasks'
-import { ELEMENT_LABEL } from '@shared/rf/network'
+import { ELEMENT_LABEL, nearestOnTrace } from '@shared/rf/network'
 import { useStudio, useHover, type Annotation } from '@/state/studio'
 import { useDerived } from '@/state/derived'
 import { useCalc } from '@/state/calc'
@@ -168,6 +168,27 @@ export function StudioChart() {
   const zoomed = view.half < VIEW - 1e-6
   const gridLabels = zoomGridLabels(view, s)
 
+  // Hovering on or near a trace reads the trace there (its frequency, and its Z), not the empty chart:
+  // a Smith chart has no frequency axis, so this is how you find "where is it at 5.2 GHz?".
+  const snap = (() => {
+    if (!hover) return null
+    const tol = 0.03 * (view.half / VIEW)
+    const hits: Array<{ which: 'load' | 'input'; f: number; g: Complex }> = []
+    if (showLoadTrace && !traceCollapsed) {
+      const h = nearestOnTrace(d.trace.map((p) => ({ f: p.f, g: p.gammaL })), hover, tol)
+      if (h) hits.push({ which: 'load', ...h })
+    }
+    if (showInputTrace && network.length > 0) {
+      const h = nearestOnTrace(d.trace.map((p) => ({ f: p.f, g: p.gammaIn })), hover, tol)
+      if (h) hits.push({ which: 'input', ...h })
+    }
+    const dist = (g: Complex) => Math.hypot(g.re - hover.re, g.im - hover.im)
+    return hits.sort((a, b) => dist(a.g) - dist(b.g))[0] ?? null
+  })()
+  // The readout under the chart shows the same point as the tip.
+  const setSnap = useHover((st) => st.setSnap)
+  useEffect(() => setSnap(snap), [setSnap, snap?.which, snap?.f, snap?.g.re, snap?.g.im]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="chart-wrap">
       <ChartBase
@@ -189,7 +210,7 @@ export function StudioChart() {
         )}
 
         {/* hover guides: constant r, x, |Γ| through the cursor */}
-        {guides && hover && <HoverGuides g={hover} admittance={overlays.admittance} />}
+        {guides && hover && <HoverGuides g={snap?.g ?? hover} admittance={overlays.admittance} />}
 
         {/* traces */}
         {showLoadTrace && loadLines.map((pts, i) => <polyline key={`l${i}`} points={pts} className="trace load" />)}
@@ -209,6 +230,7 @@ export function StudioChart() {
           })}
 
         {shown.map((p, i) => <Dot key={i} g={p.g} cls={p.cls} big={p.big} />)}
+        {snap && <circle cx={sx(snap.g)} cy={sy(snap.g)} r={0.014 * s} className={`trace-snap ${snap.which}`} />}
 
         {target && <TargetShape t={target} />}
         {annotations.map((a) => <AnnotationShape key={a.id} a={a} endGap={a.kind === 'arrow' ? gapAt(a.to) : 0} />)}
@@ -245,7 +267,9 @@ export function StudioChart() {
         />
       </ChartBase>
 
-      {hover && hoverPx && <HoverTip g={hover} z0={z0} f={d.design.f} px={hoverPx} />}
+      {hover && hoverPx && (snap
+        ? <HoverTip g={snap.g} z0={z0} f={snap.f} px={hoverPx} on={`${snap.which === 'load' ? 'Load' : 'Input (after your network)'} at ${fmtHz(snap.f, 4)}`} />
+        : <HoverTip g={hover} z0={z0} f={d.design.f} px={hoverPx} />)}
 
       <div className="chart-legend">
         <span className="lg load">● load</span>
@@ -509,10 +533,12 @@ function labelSpot(a: Annotation): Complex | null {
   }
 }
 
-function HoverTip({ g, z0, f, px }: { g: Complex; z0: number; f: number; px: { x: number; y: number } }) {
+/** What's under the cursor; `on` names the trace point it snapped to (with its frequency), if any. */
+function HoverTip({ g, z0, f, px, on }: { g: Complex; z0: number; f: number; px: { x: number; y: number }; on?: string }) {
   const m = metricsFromGamma(g, z0, f)
   return (
     <div className="hover-tip" style={{ left: px.x + 16, top: px.y + 16 }}>
+      {on && <div className="tip-head">{on}</div>}
       <div><b>z</b> {fmtC(m.z)} &nbsp; <b>Z</b> {fmtC(m.Z, 'Ω')}</div>
       <div><b>y</b> {fmtC(m.y)}</div>
       <div><b>|Γ|</b> {fmtNum(m.gammaMag)} ∠ {m.gammaDeg.toFixed(1)}° &nbsp; <b>VSWR</b> {fmtNum(m.vswr)}</div>

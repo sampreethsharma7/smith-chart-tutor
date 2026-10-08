@@ -52,6 +52,58 @@ function writeJson(path: string, data: unknown): Promise<void> {
   return next
 }
 
+/**
+ * Temp files left by a save the app was closed or killed in the middle of (between writing the
+ * temp file and renaming it). At startup: if the real file is missing or unreadable, the newest
+ * readable temp file becomes it (that save is recovered); the rest are deleted. Files younger
+ * than a minute are left alone, in case another app process is mid-save.
+ */
+export async function cleanUpTempFiles(): Promise<{ removed: number; recovered: string[] }> {
+  const out = { removed: 0, recovered: [] as string[] }
+  const tmpName = /^(.+\.json)(?:\.\d+\.\d+)?\.tmp$/
+  for (const dir of [root(), profilesDir(), workspaceDir(), tutorDir()]) {
+    let names: string[]
+    try {
+      names = await fs.readdir(dir)
+    } catch {
+      continue
+    }
+    const byTarget = new Map<string, { path: string; mtime: number }[]>()
+    for (const n of names) {
+      const m = tmpName.exec(n)
+      if (!m) continue
+      const path = join(dir, n)
+      const st = await fs.stat(path).catch(() => null)
+      if (!st || !st.isFile() || Date.now() - st.mtimeMs < 60_000) continue
+      byTarget.set(m[1], [...(byTarget.get(m[1]) ?? []), { path, mtime: st.mtimeMs }])
+    }
+    for (const [target, tmps] of byTarget) {
+      const real = join(dir, target)
+      const readable = async (p: string) => {
+        try {
+          JSON.parse(await fs.readFile(p, 'utf8'))
+          return true
+        } catch {
+          return false
+        }
+      }
+      if (!(await readable(real))) {
+        for (const t of [...tmps].sort((a, b) => b.mtime - a.mtime)) {
+          if (await readable(t.path)) {
+            await fs.copyFile(t.path, real)
+            out.recovered.push(join(dir, target))
+            break
+          }
+        }
+      }
+      for (const t of tmps) {
+        await fs.rm(t.path, { force: true }).then(() => out.removed++, () => {})
+      }
+    }
+  }
+  return out
+}
+
 const safeId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, '')
 
 // ---- settings -------------------------------------------------------------

@@ -338,7 +338,13 @@ export const useStudio = create<StudioState>((set, get) => ({
 }))
 
 /** Hover position lives in its own tiny store so mouse moves don't re-render the panels. */
-export const useHover = create<{ gamma: Complex | null; set(g: Complex | null): void }>((set) => ({
+/** A trace point the cursor snapped to: which trace, its frequency and Γ there. */
+export interface TraceSnap { which: 'load' | 'input'; f: number; g: Complex }
+
+export const useHover = create<{ gamma: Complex | null; snap: TraceSnap | null; set(g: Complex | null): void; setSnap(s: TraceSnap | null): void }>((set) => ({
   gamma: null,
-  set: (gamma) => set({ gamma })
+  /** Set by the chart while the cursor is on a trace; the readout then shows that point, like the tip */
+  snap: null,
+  set: (gamma) => set(gamma ? { gamma } : { gamma, snap: null }),
+  setSnap: (snap) => set({ snap })
 }))

@@ -279,6 +279,9 @@ app.whenReady().then(async () => {
     }
     return
   }
+  // Before anything reads the profile: finish or clear saves an earlier run was closed in the middle of.
+  const tidy = await store.cleanUpTempFiles().catch(() => null)
+  if (tidy?.recovered.length) console.log('[storage] recovered from an interrupted save:', tidy.recovered.join(', '))
   registerIpc()
   createWindow()
   autoStartOllama().catch(() => {})

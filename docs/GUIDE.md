@@ -2,7 +2,7 @@
 
 Everything the app does and how it decides, in detail. For an overview, see the [README](../README.md).
 
-A desktop Smith chart with an agentic AI tutor. The chart shows every metric (Z, z, Y, y, Γ, VSWR, return loss, mismatch loss, Q, WTG/WTL, equivalent L/C) on hover and at target-frequency markers. The tutor watches what you do on the chart, sets exercises, remembers your progress across lessons, and works with any LLM.
+A desktop Smith chart with an agentic AI tutor. The chart shows every metric (Z, z, Y, y, Γ, VSWR, return loss, mismatch loss, Q, WTG/WTL, equivalent L/C) on hover and at target-frequency markers. Hovering on or near a sweep trace snaps to it and shows that point's frequency, since a Smith chart has no frequency axis of its own. The tutor watches what you do on the chart, sets exercises, remembers your progress across lessons, and works with any LLM.
 
 **Reading the chart:**
 - **Zoom:** scroll on the chart to zoom around the cursor, and drag to pan once zoomed.
