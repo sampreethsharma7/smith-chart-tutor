@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Interactive Smith chart with an agentic, multi-provider AI tutor",
   "main": "./out/main/index.js",
-  "author": "Sampreeth Sharma",
+  "author": "Sai Sampreeth Indharapu",
   "license": "MIT",
   "private": true,
   "scripts": {

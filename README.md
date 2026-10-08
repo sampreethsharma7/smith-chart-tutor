@@ -312,4 +312,4 @@ Around it: `Start-*` and [`scripts/`](scripts/) are the one-click start from sou
 
 ## License
 
-[MIT](LICENSE) © 2026 Sampreeth Sharma
+[MIT](LICENSE) © 2026 Sai Sampreeth Indharapu
