@@ -8,7 +8,6 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -83,14 +82,18 @@ function npm(args, hints) {
 }
 
 // ── 1. The app's components: installed once, again only when package-lock.json changes ──
-const require = createRequire(join(root, 'package.json'))
+// The path to Electron's executable, downloading it if it's missing: Electron fetches its program the
+// first time it's asked for, not during npm install. Asked in a fresh Node each time, with the same
+// proxy and cache settings as npm: require() here would remember an answer from before a reinstall.
+const electronPathFile = join(runtime, 'electron-path.txt')
+const FIND_ELECTRON = `let p = ''
+try { p = require('electron') } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') console.error(e.message) }
+require('fs').writeFileSync(process.argv[1], typeof p === 'string' ? p : '')`
 function electronBinary() {
-  try {
-    const p = require('electron') // the path to Electron's executable, if it's fully installed
-    return typeof p === 'string' && existsSync(p) ? p : null
-  } catch {
-    return null
-  }
+  rmSync(electronPathFile, { force: true })
+  spawnSync(process.execPath, ['-e', FIND_ELECTRON, electronPathFile], { stdio: 'inherit', env, cwd: root })
+  const p = existsSync(electronPathFile) ? readFileSync(electronPathFile, 'utf8').trim() : ''
+  return p && existsSync(p) ? p : null
 }
 const lockFile = join(root, 'package-lock.json')
 const installedStamp = join(runtime, 'installed-lock.json')
