@@ -8,7 +8,7 @@
  * company's certificates apply, as in a browser.
  */
 import { net } from 'electron'
-import { execFile, spawn, type ChildProcess } from 'node:child_process'
+import { execFile, execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream, existsSync, promises as fs } from 'node:fs'
 import { once } from 'node:events'
@@ -232,7 +232,8 @@ const isUp = () => getJson('/api/version', 1500).then(() => true, () => false)
 /** Start `ollama serve` if nothing answers yet; it runs while the app runs. */
 export async function startOllama(binary: string): Promise<void> {
   if (await isUp()) return
-  const p = spawn(binary, ['serve'], { env: { ...process.env, OLLAMA_HOST: `127.0.0.1:${PORT}` }, windowsHide: true, stdio: 'ignore' })
+  // Its own process group on macOS/Linux, so stopping it also stops the model runner it starts.
+  const p = spawn(binary, ['serve'], { env: { ...process.env, OLLAMA_HOST: `127.0.0.1:${PORT}` }, windowsHide: true, stdio: 'ignore', detached: process.platform !== 'win32' })
   served = p
   let failed: Error | null = null
   p.on('error', (e) => (failed = e))
@@ -246,10 +247,20 @@ export async function startOllama(binary: string): Promise<void> {
   throw new Error('Ollama did not start within 30 seconds.')
 }
 
-/** Stop the Ollama this app started (never one the user runs themselves). */
+/**
+ * Stop the Ollama this app started (never one the user runs themselves), with the model
+ * runner it started: killing only the server leaves that runner holding the GPU memory.
+ */
 export function stopOllama(): void {
-  served?.kill()
+  const p = served
   served = null
+  if (!p?.pid) return
+  try {
+    if (process.platform === 'win32') execFileSync('taskkill', ['/pid', String(p.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+    else process.kill(-p.pid, 'SIGTERM')
+  } catch {
+    p.kill() // already gone, or the tree kill wasn't possible
+  }
 }
 
 // ── Models ─────────────────────────────────────────────────────────────────────
