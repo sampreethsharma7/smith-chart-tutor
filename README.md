@@ -6,7 +6,7 @@
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-489%20passing-34d399">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-493%20passing-34d399">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a78bfa">
 </p>
 
@@ -28,6 +28,7 @@ Most Smith chart tools are calculators: they give you the answer. Most AI tutors
 Smith Chart Tutor combines the two.
 
 - **A real, interactive Smith chart.** Every metric is live: Z, z, Y, y, Γ, VSWR, return loss, mismatch loss, Q, WTG/WTL. You can import CST and Touchstone data.
+- **The matching network as a circuit.** As you add parts, a schematic draws them from source to load, each with its value and numbered in the colour of its step on the chart. Point at a part and its step lights up.
 - **An agentic AI tutor** that sees your chart, sets you tasks, and remembers you across lessons. It works with Claude, Gemini, OpenAI, OpenRouter, or a local model through Ollama or LM Studio.
 - **Exact grading.** The LLM never grades and never does arithmetic in its head. The app computes every right answer, verifies every move before the tutor explains it, and records what each answer actually proves.
 

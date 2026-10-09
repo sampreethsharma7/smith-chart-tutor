@@ -124,6 +124,9 @@ export interface StudioSnapshot {
 
 interface StudioState extends StudioSnapshot {
   pinned: Complex | null
+  /** The network part under the pointer (schematic or list), by index from the load: its step lights up on the chart. Not saved. */
+  hoverElement: number | null
+  setHoverElement(i: number | null): void
   clickMode: ClickMode
   events: ChartEvent[]
   /** What part of the chart is shown (zoom/pan); not saved */
@@ -213,6 +216,10 @@ export function describeView(v: ChartView): string {
 export const useStudio = create<StudioState>((set, get) => ({
   ...DEFAULT_SNAPSHOT,
   pinned: null,
+  hoverElement: null,
+  setHoverElement(i) {
+    if (get().hoverElement !== i) set({ hoverElement: i })
+  },
   clickMode: 'inspect',
   events: [],
   view: FULL_VIEW,
@@ -237,7 +244,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   },
 
   set(key, value, why) {
-    set({ [key]: value } as Partial<StudioState>)
+    set({ [key]: value, ...(key === 'network' ? { hoverElement: null } : {}) } as Partial<StudioState>)
     if (why) get().logEvent(String(key), why)
   },
   setLoad(load, why) {
@@ -272,7 +279,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   },
   removeElement(id) {
     const el = get().network.find((e) => e.id === id)
-    set({ network: get().network.filter((e) => e.id !== id) })
+    // Its row (and the pointer on it) is gone: no step left lit on the chart.
+    set({ network: get().network.filter((e) => e.id !== id), hoverElement: null })
     if (el) get().logEvent(`rm_${id}`, `Removed ${ELEMENT_LABEL[el.kind]}`)
   },
   moveElement(id, dir) {
@@ -285,7 +293,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     get().logEvent('reorder', `Reordered network: ${n.map((e) => ELEMENT_LABEL[e.kind]).join(' → ')} (load → source)`)
   },
   clearNetwork() {
-    set({ network: [] })
+    set({ network: [], hoverElement: null })
     get().logEvent('clear', 'Cleared the matching network')
   },
   addMarker(f) {
@@ -335,6 +343,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   loadSnapshot(s) {
     set({
       ...DEFAULT_SNAPSHOT,
+      hoverElement: null,
       ...s,
       // Workspaces saved before the band could be hidden: a fixed load gets the single-frequency view.
       showBand: s.showBand ?? (s.load ? loadVariesWithFrequency(s.load) : DEFAULT_SNAPSHOT.showBand),

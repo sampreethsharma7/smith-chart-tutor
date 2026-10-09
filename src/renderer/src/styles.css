@@ -706,3 +706,27 @@ span.covered-note { display: inline; border: none; padding: 0; font-style: itali
 .course-details table { margin-bottom: 6px; }
 .course-banner { display: flex; align-items: center; gap: 12px; padding: 6px 12px; background: var(--panel-2); border-bottom: 2px solid var(--warn); font-size: 13px; }
 .course-banner span { flex: 1; }
+
+/* Circuit drawing of the matching network (source left, load right) */
+.schematic { overflow-x: auto; margin: 6px 0 8px; padding: 2px 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; }
+.schematic svg { display: block; width: 100%; height: auto; margin: 0 auto; }
+.schematic path, .schematic rect, .schematic circle { fill: none; stroke: var(--text-2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.schematic .sch-thin { stroke-width: 1; }
+.schematic .sch-dot { fill: var(--text-2); }
+.schematic text { font-size: 9.5px; text-anchor: middle; fill: var(--text-2); stroke: none; }
+.schematic .sch-name { fill: var(--muted); }
+.schematic .sch-open { font-size: 7.5px; fill: currentColor; }
+.schematic .sch-el { cursor: pointer; }
+.schematic .sch-el path, .schematic .sch-el rect:not(.sch-hit), .schematic .sch-el circle:not(.sch-badge) { stroke: currentColor; }
+.schematic .sch-el .sch-dot { fill: currentColor; }
+/* Wires and the ground rail stay neutral: only a part's own symbol wears its step's colour. */
+.schematic .sch-el path.sch-wire { stroke: var(--text-2); }
+.schematic .sch-hit { stroke: none; fill: transparent; }
+.schematic .sch-badge { fill: currentColor; stroke: none; }
+.schematic .sch-num { fill: var(--accent-ink); font-weight: 700; font-size: 10px; }
+.schematic .sch-el.hl path, .schematic .sch-el.hl rect:not(.sch-hit) { stroke-width: 2.6; }
+.schematic .sch-el.dim { opacity: 0.4; }
+.schematic.compact { margin: 4px 0; }
+.built summary { cursor: pointer; }
+.elements li.flash { animation: el-flash 1.2s ease-out; }
+@keyframes el-flash { from { box-shadow: 0 0 0 2px var(--accent); } to { box-shadow: 0 0 0 2px transparent; } }

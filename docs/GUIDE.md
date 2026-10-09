@@ -133,6 +133,8 @@ While either assistant is replying, the other tab is locked, because its tools a
 
 ## Calculator and formulas
 
+**The circuit drawing.** Above the list of parts, the Network panel draws the matching network as a circuit: the source on the left, the load on the right, the way circuits are usually drawn. The list runs the other way (load → source, the order the point moves on the chart), so each part carries the list's number, in the colour of its step on the chart. Series parts sit in the signal wire; shunt parts and stubs go down to the ground rail (a shorted stub reaches it, an open one stops short); a line is drawn as a section of the wire with its length and Zc. **Point at a part**, in the drawing or the list, and its step lights up on the chart while the others fade; **click it** to find it in the list. After your first Check, the task card shows the same drawing under *What you built*, so the tutor's follow-up ("why this part first?") has the circuit in front of you. When a reading question covers the values, a fixed load's impedance is hidden in the drawing too.
+
 The **Calculator** panel (under the matching network) does the arithmetic that goes with reading the chart, at the design frequency and Z0. It shows its working as typeset formulas with your numbers put in:
 
 - **Convert:** one point as Z, z, Y, y, Γ, VSWR, return loss and Q (type it, or take the load, the input or a clicked point).

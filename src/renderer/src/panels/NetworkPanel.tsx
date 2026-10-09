@@ -4,6 +4,7 @@ import { CoveredNote } from '@/panels/Readout'
 import { useDerived } from '@/state/derived'
 import { NumField } from '@/components/NumField'
 import { fmtC, fmtNum } from '@/lib/format'
+import { Schematic } from '@/components/Schematic'
 
 const ADD: Array<{ kind: ElementKind; short: string }> = [
   { kind: 'seriesL', short: 'Ser L' }, { kind: 'seriesC', short: 'Ser C' },
@@ -55,12 +56,13 @@ export function NetworkPanel() {
         ))}
       </div>
       {network.length === 0 && <div className="muted">No elements yet. Add one and drag its slider to see how it moves the point.</div>}
+      {network.length > 0 && <Schematic />}
       <ol className="elements">
         {network.map((el, i) => {
           const g = nodes[i]
           const zAfter = g ? fmtC({ re: (1 - g.re * g.re - g.im * g.im) / ((1 - g.re) ** 2 + g.im ** 2), im: (2 * g.im) / ((1 - g.re) ** 2 + g.im ** 2) }) : '—'
           return (
-            <li key={el.id}>
+            <li key={el.id} id={`net-el-${el.id}`} onMouseEnter={() => st().setHoverElement(i)} onMouseLeave={() => st().setHoverElement(null)}>
               <div className="el-head">
                 <span className="el-idx">{i + 1}</span>
                 <b>{ELEMENT_LABEL[el.kind]}</b>

@@ -66,7 +66,10 @@ export function StudioChart() {
   const overlays = useStudio((s) => s.overlays)
   const network = useStudio((s) => s.network)
   // The step the learner is pointing at in the calculator stands out; the others step back.
-  const calcHighlight = useCalc((s) => (s.open && s.tab === 'network' ? s.highlight : null))
+  const calcPick = useCalc((s) => (s.open && s.tab === 'network' ? s.highlight : null))
+  // A part pointed at in the schematic or the network list lights up its step, else the calculator's pick.
+  const hoverPart = useStudio((s) => s.hoverElement)
+  const calcHighlight = hoverPart ?? calcPick
   const annotations = useStudio((s) => s.annotations)
   // A reach task's target, drawn so the learner sees where to aim (unless finding it is the task).
   const exercise = useStudio((s) => s.exercise)

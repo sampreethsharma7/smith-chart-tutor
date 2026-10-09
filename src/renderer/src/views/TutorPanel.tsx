@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
+import { Schematic } from '@/components/Schematic'
 import type { Sure } from '@shared/profile'
 import { useTutor, type DisplayItem } from '@/agent/tutor'
 import { useStudio } from '@/state/studio'
@@ -302,6 +303,7 @@ function ExerciseCard() {
   useStudio((s) => s.load)
   useStudio((s) => s.z0)
   useStudio((s) => s.datasets)
+  const network = useStudio((s) => s.network)
   const [last, setLast] = useState<string | null>(null)
   useEffect(() => setLast(null), [ex?.id])
   if (!ex) return null
@@ -333,6 +335,12 @@ function ExerciseCard() {
           The chart's load or Z0 has changed from your project's.{' '}
           <button className="link small" onClick={() => setLast(restoreProjectLoad())}>Put the project's load back</button>
         </div>
+      )}
+      {ex.attempts > 0 && network.length > 0 && (
+        <details className="built" open>
+          <summary className="small muted">What you built</summary>
+          <Schematic compact />
+        </details>
       )}
       <div className="row">
         <button className="primary" onClick={check} disabled={busy}>
