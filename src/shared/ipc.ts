@@ -1,5 +1,6 @@
 import type { ChatRequest, Connection, ProviderConfig, StreamEvent } from './llm'
 import type { BenchmarkReport } from './benchmark'
+import type { CourseReport } from './course'
 import type { MachineInfo, OllamaStatus, SetupProgress, SetupResult } from './localModels'
 
 export interface AppSettings {
@@ -13,6 +14,10 @@ export interface AppSettings {
   benchmarks: Record<string, BenchmarkReport>
   /** Every benchmark run on this machine, including models since removed */
   benchmarkHistory: BenchmarkReport[]
+  /** Course runs (a scripted learner taught for several lessons), newest last */
+  courseRuns?: CourseReport[]
+  /** Set while a course run is going: what to put back (and the profile to delete) if the app closes mid-run */
+  courseRunActive?: { learnerId: string; profileId: string | null; providerId: string | null }
 }
 
 export interface OpenedFile {

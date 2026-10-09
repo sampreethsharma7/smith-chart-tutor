@@ -353,6 +353,24 @@ Finishing a lesson (after the goal or early) writes a summary for the tutor's me
 
 Data folder (plain JSON): `%APPDATA%/smith-tutor/data/`. Profiles → *Open data folder*.
 
+### Course run: a model on whole lessons
+
+The benchmark checks single replies. A **course run** (Models tab, under Compare models) checks whole lessons: the tutor teaches a scripted beginner for several lessons in a row (6 by default), and the app scores the teaching from what happened. You choose when to run it, since it costs model requests: about 20–35 a lesson, shown before you start.
+
+- **The learner is scripted, not a model**, so only the tutor uses requests. It has a hidden ability per skill that starts at beginner level and grows with practice. It answers graded cards right or wrong by chance from that ability (harder, more independent and covered items are harder; help makes them easier), says how sure it is, builds task networks with the app's own solvers (a wrong try has one part the wrong size), and sometimes takes a beginner's shortcuts: "Show values", typing a point, asking for help, skipping. When no card is open it sends short beginner lines ("ok", "I don't get it", "can I try a harder one?"). The same **seed** gives the same learner, so runs can be compared.
+- **It runs in the app itself**, on a throwaway profile, with the real tutor and the real answer paths, starting each lesson on the tutor's pick. A lesson ends when the tutor reaches its goal, or after 30 learner actions. You can watch on Learn, and stop it at any time. While it runs, the profile and model pickers are locked, and no benchmark can start (the run counts every request). Afterwards the throwaway profile is deleted and your profile, model and page come back; only the report is kept, even when the run was stopped or a lesson failed. If the app closes mid-run, the next start puts your profile and model back and deletes the learner. Its faults go into the report, not the issue log.
+- **The scores are counted, none judged by a model:**
+  - *Rising challenge*: each item in the second half is compared with the first half on its own skill (above it, level with it, or below it), and a skill first met in the second half counts as new ground; plus the independence steps the learner climbs (ladder rungs, reading from the chart). Not scored for a one-lesson run.
+  - *No repeats*: the same item (the same point, value, move or task, whatever the wording) asked again after a right answer.
+  - *Reading from the chart*: in the later lessons, the tutor covers the values on reading questions instead of showing them (what the learner then does, like uncovering them, doesn't count against it).
+  - *Clean replies*: tool names, withheld replies or a literal `
+` reaching the learner, and claims of drawings or changes that weren't made.
+  - *Smooth flow*: refused tool calls, repeats, step limits, empty replies, and stretches of 3 learner messages without a card or task.
+  - *Right physics*: directions the app had to correct.
+  - *Lessons finished*: lessons that reached their goal.
+
+  The details show the item level lesson by lesson, how reading answers were seen, the project's steps, tasks the scripted learner couldn't solve (not counted against the tutor), and each lesson's goal, cards, tasks and requests. The tutor's notes between lessons are model requests; the last lesson's notes are not, since the learner is deleted after it.
+
 ## Finding problems: flags, the issue log and the audit
 
 Three things work together so problems get found and fixed, most common first. All of it stays on your PC.

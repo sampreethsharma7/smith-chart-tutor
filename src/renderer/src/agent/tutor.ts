@@ -43,13 +43,21 @@ const ASKING_TOOLS = new Set(['ask_prediction', 'ask_locate', 'ask_move', 'ask_v
 
 const FOLLOW_UP_NUDGE = "[System] The learner just solved the task and you haven't asked your follow-up yet. Ask ONE question about their own solution now (prefer ask_move, ask_locate or ask_value, built on their network), then stop and wait. Don't close the task or the lesson first."
 
+/** Requests and tokens through callLLM since the app started (a course run measures its cost from these). */
+export const callStats = { requests: 0, tokens: 0 }
+
 /** One LLM call through the main process, streaming text to `onText`. */
 export function callLLM(req: ChatRequest, onText?: (delta: string) => void, onStart?: (requestId: string) => void): Promise<ChatResult> {
+  callStats.requests++
   return new Promise((resolve, reject) => {
     let settled = false
     const finish = (ev: StreamEvent | undefined) => {
       if (settled || !ev) return
-      if (ev.type === 'done') { settled = true; resolve(ev.result) }
+      if (ev.type === 'done') {
+        settled = true
+        callStats.tokens += (ev.result.usage?.inputTokens ?? 0) + (ev.result.usage?.outputTokens ?? 0)
+        resolve(ev.result)
+      }
       else if (ev.type === 'error') { settled = true; reject(new Error(ev.message)) }
     }
     const { requestId, done } = api().llm.chat(req, (ev) => {
@@ -117,7 +125,8 @@ interface TutorState {
   notice: string | null
   /** `design`: the learner came from the Design tab to understand that design (it's on the chart) */
   startSession(focus?: LessonFocus, design?: string): Promise<void>
-  endSession(): Promise<void>
+  /** `notesOnly`: save notes built from the record instead of asking the model for a summary (no request) */
+  endSession(opts?: { notesOnly?: boolean }): Promise<void>
   /** After the goal: carry on in the same lesson (the "goal reached" bar goes away) */
   keepGoing(): void
   reset(): void
@@ -730,7 +739,7 @@ export const useTutor = create<TutorState>((set, get) => {
       await get().send(lessonOpening(n, focus, review), { hidden: true, display: `Lesson ${n} started · ${label}${review ? ' · with a quick review' : ''}` })
     },
 
-    async endSession() {
+    async endSession(opts = {}) {
       if (get().busy) return
       const ex = useStudio.getState().exercise
       if (ex && ex.attempts > 0) get().logExercise(ex, ex.status === 'passed')
@@ -746,7 +755,8 @@ export const useTutor = create<TutorState>((set, get) => {
       }
       set({ busy: true })
       let summary = ''
-      if (provider && s.transcript.length >= 2) {
+      if (opts.notesOnly) summary = basicNotes(s)
+      else if (provider && s.transcript.length >= 2) {
         const itemId = pushItem({ kind: 'system', text: 'Writing a lesson summary…' })
         try {
           summary = await summarizeTranscript(get().session!)

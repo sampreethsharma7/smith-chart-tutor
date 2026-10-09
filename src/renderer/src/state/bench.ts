@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { runBenchmark, type BenchCheck } from '@shared/benchmark'
 import { callLLM } from '@/agent/tutor'
-import { useApp } from './app'
+import { switchLock, useApp } from './app'
 
 interface Progress {
   text: string
@@ -13,6 +13,8 @@ export const useBench = create<{ running: Record<string, Progress>; run(provider
   running: {},
   async run(providerId) {
     if (get().running[providerId]) return
+    // A course run measures its cost from every request the app makes: not alongside it.
+    if (switchLock.on) return
     const p = useApp.getState().settings.providers.find((x) => x.id === providerId)
     if (!p) return
     const setProgress = (pr: Progress | null) => {

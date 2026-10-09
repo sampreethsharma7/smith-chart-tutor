@@ -5,6 +5,7 @@ import { api, useApp } from '@/state/app'
 import { useBench } from '@/state/bench'
 import { CompareModels } from './CompareModels'
 import { LocalTutorCard } from './LocalTutorCard'
+import { CourseRunCard } from './CourseRun'
 import { confirmDialog } from '@/components/Confirm'
 
 const pct = (x: number) => `${Math.round(x * 100)}%`
@@ -58,6 +59,8 @@ export function ModelsView() {
       </div>
 
       <CompareModels />
+
+      <CourseRunCard />
     </div>
   )
 }

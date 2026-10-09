@@ -6,7 +6,7 @@
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-463%20passing-34d399">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-489%20passing-34d399">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a78bfa">
 </p>
 
@@ -122,6 +122,8 @@ When is a mistake really fixed? The app judges it the way a good tutor would, no
 Or add a connection (Anthropic, Google Gemini, OpenAI, OpenRouter, Ollama, LM Studio, or any OpenAI-compatible endpoint), then pick from its models. Keys are encrypted with your OS keychain, stay in the main process, and only go to that provider.
 
 The built-in benchmark runs **18 checks, all graded by code**, one group for each job the model does in the app: guiding, tool use, RF knowledge, RF maths, learner tracking, summaries and speed. Reference results ship with the app, so you can compare cloud and local models before you choose.
+
+A **course run** goes further: the tutor teaches a scripted beginner for several lessons, and the app counts how the teaching went (rising challenge, repeats, copied answers, leaks, loops, wrong physics, lessons finished), so runs and models can be compared on whole lessons.
 
 <p align="center">
   <img src="docs/images/models.png" alt="Compare models: Claude, Gemini and local Ollama models ranked across guiding, tool use, RF knowledge, RF maths, learner tracking, summaries and speed" width="100%">
@@ -285,7 +287,8 @@ src/
 │  ├─ memory.ts       topics, graded evidence, reviews
 │  ├─ standing.ts     targets, proof, what to work on (one source of truth)
 │  ├─ patterns.ts     slips → confusions → patterns
-│  └─ benchmark.ts    the 18 model checks
+│  ├─ benchmark.ts    the 18 model checks
+│  └─ course.ts       the course run: scripted learner and its scores
 ├─ main/              Electron main: window, storage, encrypted keys, LLM adapters (Anthropic / OpenAI-compatible / Gemini)
 ├─ preload/           a narrow, safe IPC bridge
 └─ renderer/src/
@@ -304,7 +307,7 @@ Around it: `Start-*` and [`scripts/`](scripts/) are the one-click start from sou
 📖 **[The full guide](docs/GUIDE.md)** covers every feature and how the app decides:
 
 - reading the chart
-- the benchmark
+- the benchmark and course runs
 - the calculator
 - how answers are weighed
 - standing and proof

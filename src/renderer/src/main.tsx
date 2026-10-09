@@ -11,6 +11,7 @@ import { solveLMatch, toNetwork } from '@shared/rf/solvers'
 import { inputImpedance, loadImpedance } from '@shared/rf/network'
 import { runTool } from './agent/registry'
 import { computeDerived } from './state/derived'
+import { useCourse } from './state/course'
 import './styles.css'
 
 // Test harness only (the app was started with SMITH_CAPTURE): a script can act as the learner.
@@ -24,7 +25,7 @@ if ((window as unknown as { smithDevHooks?: boolean }).smithDevHooks) {
     learnerTurns: () => 1,
     session: () => useTutor.getState().session
   }
-  Object.assign(window, { __smith: { useStudio, useTutor, useDesigner, runDesignTool, useApp, useCalc, findReach, solveLMatch, toNetwork, loadImpedance, inputImpedance, tool: (name: string, args: Record<string, unknown>) => runTool(name, args, toolCtx as never) } })
+  Object.assign(window, { __smith: { useCourse, useStudio, useTutor, useDesigner, runDesignTool, useApp, useCalc, findReach, solveLMatch, toNetwork, loadImpedance, inputImpedance, tool: (name: string, args: Record<string, unknown>) => runTool(name, args, toolCtx as never) } })
 }
 
 createRoot(document.getElementById('root')!).render(

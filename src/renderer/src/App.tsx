@@ -18,6 +18,8 @@ import { JourneyBar, LessonStatus } from '@/components/JourneyBar'
 import { overallLevel } from '@shared/profile'
 import { FlagDialog } from '@/components/Flag'
 import { ConfirmHost } from '@/components/Confirm'
+import { CourseRunBanner } from '@/views/CourseRun'
+import { useCourse } from '@/state/course'
 
 const TABS: Array<{ id: View; label: string; title: string }> = [
   { id: 'studio', label: 'Learn', title: 'Lessons with the tutor, on the Smith chart' },
@@ -37,6 +39,8 @@ export function App() {
   const tutorBusy = useTutor((s) => s.busy)
   const designBusy = useDesigner((s) => s.busy)
   const busy = tutorBusy || designBusy
+  // A course run alone switches the profile and the model while it runs.
+  const courseRun = useCourse((s) => !!s.running)
   const { init, setView, selectProfile, setActiveProvider } = useApp.getState()
 
   useEffect(() => {
@@ -71,18 +75,19 @@ export function App() {
         <LessonStatus />
         <label className="top-select" title="Learner profile">
           <span>👤</span>
-          <select value={profile.id} disabled={busy} title={busy ? `Wait for the ${tutorBusy ? 'tutor' : 'design assistant'} to finish` : undefined} onChange={(e) => selectProfile(e.target.value)}>
+          <select value={profile.id} disabled={busy || courseRun} title={courseRun ? 'A course run is going (Models tab)' : busy ? `Wait for the ${tutorBusy ? 'tutor' : 'design assistant'} to finish` : undefined} onChange={(e) => selectProfile(e.target.value)}>
             {profiles.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.assessment ? overallLevel(p.skills).level : 'new'}</option>)}
           </select>
         </label>
         <label className="top-select" title="AI model (tutor and design assistant)">
           <span>🤖</span>
-          <select value={settings.activeProviderId ?? ''} onChange={(e) => setActiveProvider(e.target.value || null)}>
+          <select value={settings.activeProviderId ?? ''} disabled={courseRun} title={courseRun ? 'A course run is going (Models tab)' : undefined} onChange={(e) => setActiveProvider(e.target.value || null)}>
             {settings.providers.length === 0 && <option value="">no model</option>}
             {settings.providers.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
         </label>
       </header>
+      <CourseRunBanner />
       <JourneyBar />
       <FlagDialog />
       <ConfirmHost />
