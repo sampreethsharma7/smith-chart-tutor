@@ -16,6 +16,7 @@ import { ProgressView } from '@/views/ProgressView'
 import { ProfilesView } from '@/views/ProfilesView'
 import { JourneyBar, LessonStatus } from '@/components/JourneyBar'
 import { overallLevel } from '@shared/profile'
+import { FlagDialog } from '@/components/Flag'
 
 const TABS: Array<{ id: View; label: string; title: string }> = [
   { id: 'studio', label: 'Learn', title: 'Lessons with the tutor, on the Smith chart' },
@@ -82,6 +83,7 @@ export function App() {
         </label>
       </header>
       <JourneyBar />
+      <FlagDialog />
 
       {view === 'studio' || view === 'design' ? (
         <main className="studio">

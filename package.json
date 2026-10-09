@@ -11,6 +11,7 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "audit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/audit.mjs",
     "test": "vitest run"
   },
   "dependencies": {

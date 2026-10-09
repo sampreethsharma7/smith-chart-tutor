@@ -6,6 +6,7 @@ import { activeProvider, useApp } from '@/state/app'
 import { exerciseGoal } from '@/state/exercise'
 import { answerQuestion, checkExercise, skipQuestion, unsureQuestion } from '@/agent/answers'
 import { Markdown } from '@/components/Markdown'
+import { FlagButton } from '@/components/Flag'
 import { parseComplex } from '@shared/rf/tasks'
 import { gammaFromZ } from '@shared/rf/metrics'
 import { SureButton, SureKey } from '@/components/SureButton'
@@ -97,9 +98,10 @@ export function TutorPanel() {
 const SHOWN = 150
 
 /** One chat message. Memoised: while a reply streams in, only that message re-renders. */
-export const Message = memo(function Message({ it }: { it: DisplayItem }) {
+export const Message = memo(function Message({ it, agent = 'tutor' }: { it: DisplayItem; agent?: 'tutor' | 'design' }) {
   return (
     <div className={`msg ${it.kind}`} title={it.model ? `Written by ${it.model}` : undefined}>
+      {it.kind === 'tutor' && it.text && !it.streaming && <FlagButton agent={agent} itemId={it.id} />}
       {it.kind === 'tutor' ? (
         it.text ? <Markdown text={it.text} /> : <span className="dots">thinking</span>
       ) : it.kind === 'tool' ? (

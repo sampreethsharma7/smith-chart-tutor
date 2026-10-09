@@ -133,6 +133,9 @@ function registerIpc() {
     return Promise.all(r.filePaths.map(async (p) => ({ name: basename(p), text: await fs.readFile(p, 'utf8') })))
   })
   ipcMain.handle('files:openDataFolder', () => shell.openPath(store.dataFolder()))
+  ipcMain.handle('reports:save', async (e, report: unknown) => store.saveReport(report, (await e.sender.capturePage()).toPNG()))
+  ipcMain.handle('reports:openFolder', async () => shell.openPath(await store.reportsFolder()))
+  ipcMain.handle('issues:append', (_e, entries: unknown[]) => store.appendIssues(entries))
 
   // A free local tutor: find or install Ollama (no admin rights), start it, fetch the model, measure it.
   const setups = new Map<string, AbortController>()

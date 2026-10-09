@@ -289,4 +289,37 @@ export async function saveDesign(profileId: string, part: string, data: unknown)
   else await writeJson(designFile(profileId, part), data)
 }
 
+// ---- problem reports and the issue log (local only) ---------------------------
+
+const reportsDir = () => join(root(), 'reports')
+
+export async function reportsFolder() {
+  await fs.mkdir(reportsDir(), { recursive: true })
+  return reportsDir()
+}
+
+/** A flagged problem: the JSON (what was said, the tool calls, the chart) and a screenshot beside it. */
+export async function saveReport(report: unknown, png: Buffer): Promise<string> {
+  const name = `${new Date().toISOString().replace(/[:.]/g, '-')}`
+  await fs.mkdir(reportsDir(), { recursive: true })
+  await writeJson(join(reportsDir(), `${name}.json`), { ...(report as object), screenshot: `${name}.png` })
+  await fs.writeFile(join(reportsDir(), `${name}.png`), png)
+  return name
+}
+
+const ISSUE_LOG_MAX = 2 * 1024 * 1024
+let issueWrite: Promise<void> = Promise.resolve()
+
+/** Faults the app noticed, one JSON line each; at 2 MB the log moves to issues.old.jsonl and starts again. */
+export function appendIssues(entries: unknown[]): Promise<void> {
+  if (!Array.isArray(entries) || !entries.length) return Promise.resolve()
+  const file = join(root(), 'issues.jsonl')
+  issueWrite = issueWrite.catch(() => {}).then(async () => {
+    const size = await fs.stat(file).then((s) => s.size, () => 0)
+    if (size > ISSUE_LOG_MAX) await fs.rename(file, join(root(), 'issues.old.jsonl')).catch(() => {})
+    await fs.appendFile(file, entries.map((x) => JSON.stringify(x)).join('\n') + '\n', 'utf8')
+  })
+  return issueWrite
+}
+
 export const dataFolder = root

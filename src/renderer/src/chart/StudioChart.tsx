@@ -8,6 +8,7 @@ import { useDerived } from '@/state/derived'
 import { useCalc } from '@/state/calc'
 import { fmtC, fmtHz, fmtNum, fmtDb } from '@/lib/format'
 import { ChartBase, clampView, FULL_VIEW, frameView, useChartScale, VIEW, type ChartView } from './ChartBase'
+import { useFlag } from '@/components/Flag'
 import { valueThrough, arrowAlong, bCircle, gCircle, polylines, type Pt, qCircles, R_MAJOR, R_MINOR, rCircle, sx, sy, vswrCircle, X_MAJOR, X_MINOR, xCircle, type Circle } from './geometry'
 import { around, mergeCoincident, placeLabels, textWidth, type Box, type LabelRequest } from './labels'
 
@@ -301,6 +302,7 @@ export function StudioChart() {
         <button onClick={() => zoomBy(1.5)} disabled={!zoomed} title="Zoom out">－</button>
         <button onClick={focus} title="Zoom to the load, input, markers and matching path">⌖ Focus</button>
         <button onClick={() => setView(FULL_VIEW)} disabled={!zoomed} title="Show the whole chart">Fit</button>
+        <button onClick={() => useFlag.getState().open({ what: 'chart' })} title="Flag a problem with the chart (saves a report on this PC)">⚑</button>
         <span className="sep" />
         <button onClick={() => setText(-1)} disabled={textScale === TEXT_STEPS[0]} title="Smaller text and dots">A−</button>
         <button onClick={() => setText(1)} disabled={textScale === TEXT_STEPS[TEXT_STEPS.length - 1]} title="Larger text and dots">A+</button>

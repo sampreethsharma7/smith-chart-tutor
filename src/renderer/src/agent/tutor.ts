@@ -10,7 +10,8 @@ import { computeDerived } from '@/state/derived'
 import { buildSystemPrompt } from './prompt'
 import { COORDINATES_NUDGE, directionErrors, directionNudge, isMetaReply, isStageDirection, META_NUDGE, moveClaims, VERIFY_NUDGE } from './verify'
 import { migrateLessonState } from '@shared/lesson'
-import { endsTurn, runTool, toolActivity, toolSpecs } from './registry'
+import { endsTurn, runTool, toolActivity, toolSpecs, TOOLS } from './registry'
+import { TurnAudit } from './issueLog'
 import type { ToolContext } from './types'
 
 export interface DisplayItem {
@@ -419,7 +420,17 @@ export const useTutor = create<TutorState>((set, get) => {
     autoRecorded: (skill) => get().autoRecorded.includes(skill)
   }
 
+  /** One turn of the tutor, with what it said and did checked for faults afterwards (the issue log). */
   async function runAgent() {
+    const audit = new TurnAudit('tutor', activeProvider()?.label, TOOLS.map((t) => t.name))
+    try {
+      await runSteps(audit)
+    } finally {
+      audit.finish()
+    }
+  }
+
+  async function runSteps(audit: TurnAudit) {
     const provider = activeProvider()
     const profile = useApp.getState().profile
     if (!provider || !profile) {
@@ -472,6 +483,7 @@ export const useTutor = create<TutorState>((set, get) => {
       const coordsUnknown = get().session?.plan?.coordinates === 'unknown'
       // Text about the machinery ("This response is hidden from the learner. Retry now.") is never shown.
       if (isMetaReply(text)) {
+        audit.event('guard', 'reply about the machinery withdrawn')
         removeItem(itemId)
         if (metaFixes++ >= 2) return
         const h = get().history
@@ -491,6 +503,7 @@ export const useTutor = create<TutorState>((set, get) => {
         if (needFix) directionFixes++
         if (needCoords) coordsNudges++
         if (needVerify) verifyNudged = true
+        audit.event('guard', needFix ? `wrong direction rewritten (${wrongDirections.map((e) => e.fix).join('; ').slice(0, 120)})` : needCoords ? 'move described with coordinates unknown' : 'move described without checking it (what_if)')
         removeItem(itemId)
         pushItem({ kind: 'tool', text: 'Double-checking that on the chart…' })
         const h = get().history
@@ -510,6 +523,7 @@ export const useTutor = create<TutorState>((set, get) => {
         spoke = true
         patchItem(itemId, (i) => ({ ...i, text, streaming: false }))
         logTranscript('tutor', text, provider.label)
+        audit.said(text)
         // The model wouldn't establish the coordinates: show the reply, but say plainly that it's unconfirmed.
         if (claims && coordsUnknown) {
           pushItem({ kind: 'system', text: "Careful: the tutor hasn't confirmed whether it means impedance (z) or admittance (y), so the directions above aren't checked. Ask it which one." })
@@ -526,12 +540,14 @@ export const useTutor = create<TutorState>((set, get) => {
         // Solved, praised, but no follow-up asked: ask for it once.
         if (spoke && get().followUpDue && !followNudged && !get().completing) {
           followNudged = true
+          audit.event('guard', 'follow-up question owed, asked for it')
           set({ history: [...get().history, { role: 'user', parts: [{ type: 'text', text: FOLLOW_UP_NUDGE }] }] })
           continue
         }
         if (spoke || nudged) return
         // Model returned nothing: ask once for a reply.
         nudged = true
+        audit.event('empty-reply', 'returned nothing')
         set({ history: [...get().history, { role: 'user', parts: [{ type: 'text', text: '[System] Please reply to the learner now, in plain text.' }] }] })
         continue
       }
@@ -555,6 +571,7 @@ export const useTutor = create<TutorState>((set, get) => {
         patchItem(toolItem, (i) => ({ ...i, text: toolActivity(call.name, call.args) + (r.isError ? ' (skipped)' : '') }))
         if (r.isError && /Already done|times this turn/.test(r.content)) removeItem(toolItem)
         results.push({ type: 'tool_result', callId: call.id, name: call.name, content: r.content, isError: r.isError })
+        audit.tool(call.name, !r.isError, r.content)
         if (!r.isError) {
           if (READ_ONLY.has(call.name)) seenCalls.set(key, r.content.slice(0, 4000))
           else seenCalls.clear()
@@ -576,6 +593,7 @@ export const useTutor = create<TutorState>((set, get) => {
       // It already spoke in the reply that set the card (or closed the lesson): the learner has the floor.
       if (finalStep && text.trim()) return
     }
+    audit.event('step-limit', `${MAX_STEPS} steps`)
     pushItem({ kind: 'system', text: 'The tutor took many steps in a row; paused here. Say something to continue.' })
   }
 

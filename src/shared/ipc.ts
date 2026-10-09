@@ -60,6 +60,15 @@ export interface DesktopApi {
     get(profileId: string, part: DesignPart): Promise<unknown>
     save(profileId: string, part: DesignPart, data: unknown): Promise<void>
   }
+  /** Problem reports (the Flag button) and the automatic issue log, kept on this PC only */
+  reports: {
+    /** Save a report with a screenshot of the window; returns its file name */
+    save(report: unknown): Promise<string>
+    openFolder(): Promise<void>
+  }
+  issues: {
+    append(entries: unknown[]): Promise<void>
+  }
   files: {
     openData(): Promise<OpenedFile[]>
     openDataFolder(): Promise<void>

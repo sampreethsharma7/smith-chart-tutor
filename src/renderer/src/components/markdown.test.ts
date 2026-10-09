@@ -46,7 +46,7 @@ describe('emphasis around formulas', async () => {
 describe('escaped line breaks from a model', () => {
   it('shows "\n\n" as a break (a real Gemini card), but leaves LaTeX like \nu alone', async () => {
     const { unescapeBreaks } = await import('./Markdown')
-    expect(unescapeBreaks('Spot on! That is exactly z = 0.\n\nNow, at this short')).toBe('Spot on! That is exactly z = 0.\n\nNow, at this short')
-    expect(unescapeBreaks('$\nu = 2$ and $\nabla$')).toBe('$\nu = 2$ and $\nabla$')
+    expect(unescapeBreaks('Spot on! That is exactly z = 0.\\n\\nNow, at this short')).toBe('Spot on! That is exactly z = 0.\n\nNow, at this short')
+    expect(unescapeBreaks('$\\nu = 2$ and $\\nabla$')).toBe('$\\nu = 2$ and $\\nabla$')
   })
 })

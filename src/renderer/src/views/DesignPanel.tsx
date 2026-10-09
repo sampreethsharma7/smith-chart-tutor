@@ -81,7 +81,7 @@ export function DesignPanel() {
             </div>
           </div>
         )}
-        {items.map((it) => <Message key={it.id} it={it} />)}
+        {items.map((it) => <Message key={it.id} it={it} agent="design" />)}
         {busy && !items.some((i) => i.streaming) && <div className="msg tutor"><span className="dots">thinking</span></div>}
       </div>
 

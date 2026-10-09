@@ -11,6 +11,7 @@ import { runToolIn, specsOf, toolActivity } from './registry'
 import { buildDesignPrompt } from './design/prompt'
 import { designTools, partsText, type DesignContext, type Proposal } from './design/tools'
 import type { AgentTool } from './types'
+import { TurnAudit } from './issueLog'
 
 /**
  * The Design tab's assistant: matches the user's own loads with them, like a colleague.
@@ -139,7 +140,19 @@ export const useDesigner = create<DesignerState>((set, get) => {
   }
   designCtx = ctx
 
-  async function runAgent() {
+  /** One turn, checked for faults afterwards (the issue log). */
+  async function runAgent(applied = false) {
+    const audit = new TurnAudit('design', activeProvider()?.label, TOOLS.map((t) => t.name))
+    // The app applied a design for them this turn ("apply option 2"): that's a real change.
+    if (applied) audit.tool('app_apply', true, '')
+    try {
+      await runSteps(audit)
+    } finally {
+      audit.finish()
+    }
+  }
+
+  async function runSteps(audit: TurnAudit) {
     const provider = activeProvider()
     const profile = useApp.getState().profile
     if (!provider || !profile) {
@@ -172,14 +185,17 @@ export const useDesigner = create<DesignerState>((set, get) => {
       const message = res.message
       const text = textOf(message)
       set({ usage: { input: get().usage.input + (res.usage.inputTokens ?? 0), output: get().usage.output + (res.usage.outputTokens ?? 0) } })
-      if (text.trim()) patchItem(itemId, (i) => ({ ...i, text, streaming: false }))
-      else removeItem(itemId)
+      if (text.trim()) {
+        patchItem(itemId, (i) => ({ ...i, text, streaming: false }))
+        audit.said(text)
+      } else removeItem(itemId)
       if (message.parts.length) set({ history: [...get().history, message] })
 
       const calls = message.parts.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call')
       if (!calls.length) {
         if (text.trim() || nudged) return
         nudged = true
+        audit.event('empty-reply', 'returned nothing')
         set({ history: [...get().history, { role: 'user', parts: [{ type: 'text', text: '[System] Please reply to the user now, in plain text.' }] }] })
         continue
       }
@@ -201,6 +217,7 @@ export const useDesigner = create<DesignerState>((set, get) => {
           : await runToolIn(BY_NAME, call.name, call.args, ctx, "(Note for you: don't mention this error to the user; fix the call or carry on.)")
         patchItem(toolItem, (i) => ({ ...i, text: toolActivity(call.name, call.args, BY_NAME) + (r.isError ? ' (skipped)' : '') }))
         results.push({ type: 'tool_result', callId: call.id, name: call.name, content: r.content, isError: r.isError })
+        audit.tool(call.name, !r.isError, r.content)
         if (!r.isError && call.name === 'propose_designs') shownThisTurn = true
         if (!r.isError) {
           if (READ_ONLY.has(call.name)) seen.set(key, r.content.slice(0, 4000))
@@ -209,6 +226,7 @@ export const useDesigner = create<DesignerState>((set, get) => {
       }
       set({ history: [...get().history, { role: 'user', parts: results }] })
     }
+    audit.event('step-limit', `${MAX_STEPS} steps`)
     pushItem({ kind: 'system', text: 'The assistant took many steps in a row; paused here. Say something to continue.' })
   }
 
@@ -238,7 +256,7 @@ export const useDesigner = create<DesignerState>((set, get) => {
       const said: Part = { type: 'text', text: text + activity + applied }
       set({ history: last?.role === 'user' ? [...h.slice(0, -1), { ...last, parts: [...last.parts, said] }] : [...h, { role: 'user', parts: [said] }] })
       try {
-        await runAgent()
+        await runAgent(!!applied)
       } finally {
         const hh = get().history
         set({ busy: false, requestId: null, ...(hh.length > MAX_HISTORY * 3 ? { history: trimHistory(hh, MAX_HISTORY * 2) } : {}) })

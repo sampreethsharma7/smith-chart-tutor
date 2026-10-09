@@ -318,6 +318,8 @@ Everything saves automatically, per profile, and survives tab switches, profile 
 | Chart setup, exercise card, prediction card, the tutor's drawings | as you change them | `workspaces/<id>.json` |
 | Live tutor conversation | while you talk; restored on the next launch | `conversations/<id>.json` |
 | Design tab chart and assistant chat | as you change them | `design/<id>.workspace.json`, `design/<id>.chat.json` |
+| Flagged problems (⚑) | when you save one | `reports/<time>.json` + `.png` |
+| Faults the app noticed | as they happen | `issues.jsonl` |
 | Session transcript and exercises | after every turn | `profiles/<id>.json` |
 
 Ending a lesson (by reaching the goal or finishing early) writes a summary for the tutor's memory. Lessons you never ended are summarised automatically when you next start one.
@@ -328,6 +330,20 @@ Ending a lesson (by reaching the goal or finishing early) writes a summary for t
 - A lesson stores its latest 2000 messages, each up to 4000 characters, along with the true message count. Lessons older than the last 20 keep their summary and last 20 messages.
 
 Data folder (plain JSON): `%APPDATA%/smith-tutor/data/`. Profiles → *Open data folder*.
+
+## Finding problems: flags, the issue log and the audit
+
+Three things work together so problems get found and fixed, most common first. All of it stays on your PC.
+
+- **Flag it (⚑).** Hover a tutor or design-assistant message and click ⚑, or use ⚑ in the chart toolbar. Add a line about what looks wrong if you like. The app saves a report to `reports/` in the data folder: the message, the recent conversation with every tool call and its result, the chart, and a screenshot of the window. Nothing is sent anywhere.
+- **The issue log.** The app also notes mechanical faults by itself, as they happen, in `issues.jsonl`:
+  - a reply that says it drew something, or changed the chart, when no tool did that turn
+  - a failed or refused tool call, or the same tool called over and over
+  - a tool name or a literal `\n` in what you read
+  - the step limit, an empty reply, or a guard that had to rewrite a reply
+
+  The log restarts at 2 MB; the previous one is kept as `issues.old.jsonl`.
+- **The audit.** `npm run audit` reads the reports, the issue log, the saved chats (replayed through the same checks) and the lesson transcripts, and prints the faults most common first, by model, with examples. It only reads. `npm run audit -- --since 2026-10-01` limits it to recent ones; `npm run audit -- <folder>` reads another data folder.
 
 ## Layout
 
