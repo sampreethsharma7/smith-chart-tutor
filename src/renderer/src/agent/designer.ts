@@ -56,6 +56,11 @@ interface DesignerState {
 }
 
 let seq = 0
+/** The assistant's tool context (set when the store is made), for the test harness. */
+let designCtx: DesignContext | null = null
+
+/** Run one of the design assistant's tools directly (test harness). */
+export const runDesignTool = (name: string, args: Record<string, unknown>) => runToolIn(BY_NAME, name, args, designCtx!, '')
 const iid = () => `d${Date.now().toString(36)}${seq++}`
 
 const FRESH = () => ({
@@ -67,6 +72,15 @@ const FRESH = () => ({
   proposal: null,
   undo: null
 })
+
+/** The option number in "apply 2", "ok, use option 1", "go with #3"; 0 when it isn't plainly a request to apply one. */
+export function applyRequest(text: string, count: number): number {
+  const t = text.toLowerCase()
+  if (!count || /\b(don'?t|not|why|what if|how|compare|instead of)\b|\?/.test(t)) return 0
+  const m = /\b(?:apply|use|go with|put on)\b[^.\d]{0,24}?(?:option|design|#|number|no\.?)?\s*(\d)\b/.exec(t)
+  const n = m ? Number(m[1]) : 0
+  return n >= 1 && n <= count ? n : 0
+}
 
 export const useDesigner = create<DesignerState>((set, get) => {
   const pushItem = (it: Omit<DisplayItem, 'id'>) => {
@@ -90,6 +104,17 @@ export const useDesigner = create<DesignerState>((set, get) => {
     set({ undo: st.network, proposal: { ...p, applied: option - 1 } })
     if (st.designFreq !== p.goal.f0) st.set('designFreq', p.goal.f0, `Design frequency set to ${fmtHz(p.goal.f0)} for the design`)
     st.set('network', o.elements.map((e) => ({ ...e })), `Applied design ${option} (${o.title}): ${partsText(o.elements)}`)
+    // A design for a band: show the band, so the numbers on the card can be seen on the chart.
+    const band = p.goal.band
+    if (band) {
+      const cur = useStudio.getState()
+      if (cur.sweep.start > band.low || cur.sweep.stop < band.high) {
+        const pad = (band.high - band.low) * 0.5
+        cur.set('sweep', { ...cur.sweep, start: Math.min(cur.sweep.start, band.low - pad), stop: Math.max(cur.sweep.stop, band.high + pad) })
+      }
+      if (!cur.markers.length) cur.set('markers', [band.low, band.high])
+      cur.setShowBand(true, 'tutor', 'to show the band the design was made for')
+    }
     return `Applied option ${option} (${o.title}) to the user's chart. They can undo it.`
   }
 
@@ -108,6 +133,7 @@ export const useDesigner = create<DesignerState>((set, get) => {
     propose: (p) => set({ proposal: p, undo: null }),
     apply
   }
+  designCtx = ctx
 
   async function runAgent() {
     const provider = activeProvider()
@@ -124,6 +150,7 @@ export const useDesigner = create<DesignerState>((set, get) => {
     const counts = new Map<string, number>()
     const seen = new Map<string, string>()
     let nudged = false
+    let shownThisTurn = false
     for (let step = 0; step < MAX_STEPS; step++) {
       const itemId = pushItem({ kind: 'tutor', text: '', streaming: true, model: provider.label })
       let res: ChatResult
@@ -165,9 +192,12 @@ export const useDesigner = create<DesignerState>((set, get) => {
         const toolItem = pushItem({ kind: 'tool', text: toolActivity(call.name, call.args, BY_NAME) + '…' })
         const r = n > 4
           ? { content: `You have called ${call.name} ${n} times this turn. Stop calling tools and reply to the user.`, isError: true }
+          : call.name === 'propose_designs' && shownThisTurn
+            ? { content: 'The cards are already on screen this turn. Reply to the user now: say which you recommend and why.', isError: true }
           : await runToolIn(BY_NAME, call.name, call.args, ctx, "(Note for you: don't mention this error to the user; fix the call or carry on.)")
         patchItem(toolItem, (i) => ({ ...i, text: toolActivity(call.name, call.args, BY_NAME) + (r.isError ? ' (skipped)' : '') }))
         results.push({ type: 'tool_result', callId: call.id, name: call.name, content: r.content, isError: r.isError })
+        if (!r.isError && call.name === 'propose_designs') shownThisTurn = true
         if (!r.isError) {
           if (READ_ONLY.has(call.name)) seen.set(key, r.content.slice(0, 4000))
           else seen.clear()
@@ -189,9 +219,18 @@ export const useDesigner = create<DesignerState>((set, get) => {
       lastSeenEventAt = Date.now()
       set({ busy: true })
       pushItem({ kind: 'user', text })
+      // "Apply option 2": the app does it, so it happens even if a model only says it did.
+      let applied = ''
+      const n = applyRequest(text, get().proposal?.options.length ?? 0)
+      if (n) {
+        try {
+          applied = `\n\n[The app applied option ${n} to their chart, as they asked. Don't apply it again.]`
+          pushItem({ kind: 'tool', text: get().apply(n).replace(/ to the user's chart.*/, '') })
+        } catch { applied = '' }
+      }
       const h = get().history
       const last = h[h.length - 1]
-      const said: Part = { type: 'text', text: text + activity }
+      const said: Part = { type: 'text', text: text + activity + applied }
       set({ history: last?.role === 'user' ? [...h.slice(0, -1), { ...last, parts: [...last.parts, said] }] : [...h, { role: 'user', parts: [said] }] })
       try {
         await runAgent()

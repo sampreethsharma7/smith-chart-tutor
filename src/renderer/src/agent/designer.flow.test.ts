@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, ChatRequest, Part } from '@shared/llm'
 import { metricsFromZ } from '@shared/rf/metrics'
 import { inputImpedance, loadImpedance } from '@shared/rf/network'
+import { matchCandidates } from '@shared/rf/design'
+import { c } from '@shared/rf/complex'
 
 // ── A scripted model and an in-memory app, so the real design loop runs end to end ──
 const script: Part[][] = []
@@ -43,6 +45,8 @@ const { buildDesignPrompt } = await import('./design/prompt')
 const { designOpening } = await import('./tutor')
 
 const F = 2.4e9
+// A real match for the test load (25 − j40 Ω at 2.4 GHz)
+const GOOD = matchCandidates(c(25, -40), 50, F)[0].elements.map(({ kind, value }) => ({ kind, value }))
 const call = (name: string, args: Record<string, unknown>): Part => ({ type: 'tool_call', id: `c_${name}_${Math.random()}`, name, args })
 const say = (t: string): Part => ({ type: 'text', text: t })
 const vswr = (net = useStudio.getState().network) => {
@@ -92,17 +96,43 @@ describe('the design assistant', () => {
   })
 
   it('Apply puts the design on the chart, Undo takes it back; never onto the lesson chart', async () => {
-    script.push([call('propose_designs', { options: [{ title: 'Shunt C, series L', elements: [{ kind: 'shuntC', value: 1.8e-12 }, { kind: 'seriesL', value: 2e-9 }] }] })])
+    script.push([call('propose_designs', { options: [{ title: 'Shunt C, series L', elements: GOOD }] })])
     script.push([say('One option.')])
     await useDesigner.getState().send('go')
     const before = useStudio.getState().network
     expect(useDesigner.getState().apply(1)).toMatch(/Applied option 1/)
-    expect(useStudio.getState().network.map((e) => e.kind)).toEqual(['shuntC', 'seriesL'])
+    expect(useStudio.getState().network.map((e) => e.kind)).toEqual(GOOD.map((e) => e.kind))
     expect(useDesigner.getState().proposal!.applied).toBe(0)
     useDesigner.getState().undoApply()
     expect(useStudio.getState().network).toEqual(before)
     app.mode = 'lesson'
     expect(() => useDesigner.getState().apply(1)).toThrow(/Design chart is not open/)
+  })
+
+  it('can set up the view of the chart but never replace the user\'s load (a weak model tried, live)', async () => {
+    const before = useStudio.getState().load
+    script.push([call('set_scenario', { load: { kind: 'antenna', topology: 'parallel', f0_hz: 2.45e9, R: 50, Q: 10 }, clear_network: true, show_band: true })])
+    script.push([say('Done.')])
+    await useDesigner.getState().send('show me the band')
+    expect(useStudio.getState().load).toEqual(before)
+    expect(useStudio.getState().showBand).toBe(true)
+    const spec = requests[0].tools!.find((t) => t.name === 'set_scenario')!
+    expect(Object.keys(spec.parameters.properties ?? {})).not.toContain('load')
+    // Results read as to a colleague, not a learner.
+    expect(requests[1].messages.at(-1)!.parts.find((p) => p.type === 'tool_result')!.content).not.toMatch(/learner/i)
+  })
+
+  it('applying a design made for a band shows that band on the chart', async () => {
+    useStudio.getState().set('markers', [])
+    script.push([call('propose_designs', { band: { low_hz: 2.3e9, high_hz: 2.5e9 }, options: [{ title: 'A', elements: GOOD }] })])
+    script.push([say('One option.')])
+    await useDesigner.getState().send('go')
+    useDesigner.getState().apply(1)
+    const s = useStudio.getState()
+    expect(s.showBand).toBe(true)
+    expect(s.markers).toEqual([2.3e9, 2.5e9])
+    expect(s.sweep.start).toBeLessThanOrEqual(2.3e9)
+    expect(s.sweep.stop).toBeGreaterThanOrEqual(2.5e9)
   })
 
   it('check_network reports the band and whether it meets the target', async () => {
@@ -127,5 +157,49 @@ describe('the design assistant', () => {
     expect(t).toMatch(/^\[Lesson 3 start\]/)
     expect(t).toMatch(/Shunt C 1\.8 pF → Series L 2 nH/)
     expect(t).toMatch(/set_lesson_goal/)
+  })
+})
+
+describe('"apply option 2" is done by the app', () => {
+  it('reads plain requests to apply, and nothing else', async () => {
+    const { applyRequest } = await import('./designer')
+    expect(applyRequest('ok, apply option 1', 3)).toBe(1)
+    expect(applyRequest('Use design 2 please', 3)).toBe(2)
+    expect(applyRequest('go with #3', 3)).toBe(3)
+    expect(applyRequest('apply 2', 1)).toBe(0) // there's no option 2
+    expect(applyRequest("don't apply option 1", 3)).toBe(0)
+    expect(applyRequest('why would I use option 2?', 3)).toBe(0)
+    expect(applyRequest('use 50 ohm', 3)).toBe(0)
+    expect(applyRequest('apply option 1', 0)).toBe(0)
+  })
+
+  it('applies it before the model replies, so a model that only says it did can\'t fool anyone', async () => {
+    script.push([call('propose_designs', { options: [{ title: 'A', elements: GOOD }] })])
+    script.push([say('One option.')])
+    await useDesigner.getState().send('go')
+    script.push([say('Applied!')])
+    await useDesigner.getState().send('ok, apply option 1')
+    expect(useStudio.getState().network.map((e) => e.kind)).toEqual(GOOD.map((e) => e.kind))
+    expect(JSON.stringify(requests.at(-1)!.messages.at(-1))).toMatch(/The app applied option 1/)
+  })
+
+  it('options that are not matched at the design frequency (wrong units) never become cards', async () => {
+    script.push([call('propose_designs', { options: [{ title: 'Bad units', elements: [{ kind: 'shuntC', value: 1.8 }, { kind: 'seriesL', value: 2 }] }, { title: 'Good', elements: GOOD }] })])
+    script.push([call('propose_designs', { options: [{ title: 'Again', elements: GOOD }] })])
+    script.push([say('Done.')])
+    await useDesigner.getState().send('go')
+    expect(useDesigner.getState().proposal!.options.map((o) => o.title)).toEqual(['Good'])
+    const results = requests.flatMap((r) => r.messages.at(-1)!.parts).filter((p) => p.type === 'tool_result').map((p) => (p as any).content)
+    expect(results.join(' ')).toMatch(/Not matched at .*Bad units/)
+    expect(results.join(' ')).toMatch(/already on screen this turn/)
+  })
+})
+
+describe('the band verdict', () => {
+  it('says plainly when no option meets the band', async () => {
+    script.push([call('propose_designs', { band: { low_hz: 1.5e9, high_hz: 3.5e9 }, vswr_max: 1.2, options: [{ title: 'A', elements: GOOD }] })])
+    script.push([say('Done.')])
+    await useDesigner.getState().send('go')
+    expect(JSON.stringify(requests.at(-1)!.messages.at(-1))).toMatch(/NONE of these meets VSWR/)
   })
 })

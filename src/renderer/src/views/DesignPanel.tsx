@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDesigner } from '@/agent/designer'
 import { useTutor } from '@/agent/tutor'
-import { partsText, type DesignOption, type Proposal } from '@/agent/design/tools'
+import { cardPartsText, type DesignOption, type Proposal } from '@/agent/design/tools'
+import type { NetworkElement } from '@shared/rf/network'
 import { activeProvider } from '@/state/app'
 import { useStudio } from '@/state/studio'
 import { teachMeWhy } from '@/state/handoff'
@@ -98,40 +99,65 @@ export function DesignPanel() {
 
 function Proposals({ p, busy }: { p: Proposal; busy: boolean }) {
   const undo = useDesigner((s) => s.undo)
+  const network = useStudio((s) => s.network)
   const [open, setOpen] = useState(true)
   const { goal } = p
   const target = `VSWR ≤ ${goal.vswrMax ?? 2}${goal.band ? ` over ${fmtHz(goal.band.low)}–${fmtHz(goal.band.high)}` : ` at ${fmtHz(goal.f0)}`}`
   return (
     <div className="card design-options">
-      <div className="row">
+      <div className="design-options-head">
         <b>Design options</b>
-        <span className="muted small">{target} · ideal parts</span>
+        <span className="muted small" title="Ideal parts: no tolerance, loss or self-resonance">{target} · ideal parts</span>
         <span className="spacer" />
-        <button className="link" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'Show'}</button>
+        <button className="link" onClick={() => setOpen(!open)}>{open ? 'Hide' : `Show ${p.options.length}`}</button>
       </div>
-      {open && p.options.map((o, i) => <OptionCard key={i} o={o} n={i + 1} applied={p.applied === i} busy={busy} canUndo={!!undo && p.applied === i} />)}
+      {open && p.options.map((o, i) => {
+        const applied = p.applied === i
+        // Edited by hand since it was applied: Undo would throw those edits away, so it's no longer offered.
+        const edited = applied && !sameNetwork(network, o.elements)
+        return <OptionCard key={i} o={o} n={i + 1} goal={goal} applied={applied} edited={edited} busy={busy} canUndo={!!undo && applied && !edited} />
+      })}
     </div>
   )
 }
 
-function OptionCard({ o, n, applied, busy, canUndo }: { o: DesignOption; n: number; applied: boolean; busy: boolean; canUndo: boolean }) {
+/** VSWR for a card: "∞" for a total mismatch rather than "Infinity". */
+const vs = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '∞')
+
+const sameNetwork = (a: NetworkElement[], b: NetworkElement[]) =>
+  a.length === b.length && a.every((e, i) => e.kind === b[i].kind && Math.abs(e.value - b[i].value) <= 1e-9 * Math.abs(b[i].value))
+
+function OptionCard({ o, n, goal, applied, edited, busy, canUndo }: { o: DesignOption; n: number; goal: Proposal['goal']; applied: boolean; edited: boolean; busy: boolean; canUndo: boolean }) {
   const r = o.result
   const { apply, undoApply } = useDesigner.getState()
+  const bw = r.bandwidth
   return (
     <div className={`design-option ${o.recommended ? 'recommended' : ''} ${applied ? 'applied' : ''}`}>
-      <div className="row">
+      <div className="design-option-head">
         <b>{n}. {o.title}</b>
-        {o.recommended && <span className="chip ok">recommended</span>}
-        <span className="spacer" />
-        {applied
-          ? <>{canUndo && <button onClick={undoApply} disabled={busy}>Undo</button>}<span className="chip ok">applied</span></>
-          : <button className="primary" onClick={() => apply(n)} disabled={busy} title="Replace the network on your chart with this one">Apply</button>}
+        <span className="design-option-actions">
+          {applied && canUndo && <button onClick={undoApply} disabled={busy} title="Put back the network you had before">Undo</button>}
+          {applied
+            ? <span className="chip ok" title={edited ? 'You changed it on the chart after applying it' : undefined}>{edited ? 'applied, then edited' : 'applied'}</span>
+            : <button className="primary" onClick={() => apply(n)} disabled={busy} title="Replace the network on your chart with this one">Apply</button>}
+        </span>
       </div>
-      <div className="small">{partsText(o.elements)}</div>
-      <div className="muted small">
-        VSWR {r.vswr.toFixed(2)} ({r.returnLossDb > 60 ? 'return loss over 60 dB' : `${r.returnLossDb.toFixed(1)} dB return loss`}) at the design frequency
-        {r.band && <> · worst in band {r.band.worstVswr.toFixed(2)}{r.band.meets ? ' ✓' : ' (misses the target)'}</>}
-        {r.bandwidth && <> · matched {fmtHz(r.bandwidth.low, 3)}–{fmtHz(r.bandwidth.high, 3)} ({(r.bandwidth.fractional * 100).toFixed(1)}%{r.bandwidth.clipped ? '+' : ''})</>}
+      {o.recommended && <span className="chip ok recommended-chip">recommended</span>}
+      {/* The parts, unless the title already lists them */}
+      {!o.title.replace(/\s/g, '').includes(cardPartsText(o.elements).replace(/\s/g, '')) && <div className="small">{cardPartsText(o.elements)}</div>}
+      <div className="design-metrics small">
+        <span className="muted">At {fmtHz(goal.f0)}</span>
+        <span>VSWR {vs(r.vswr)} · {r.returnLossDb > 60 ? 'RL over 60 dB' : `RL ${r.returnLossDb.toFixed(1)} dB`}</span>
+        {r.band && <>
+          <span className="muted">In band</span>
+          <span className={r.band.meets ? 'good' : 'bad'}>worst VSWR {vs(r.band.worstVswr)} {r.band.meets ? '✓ meets it' : '✗ misses it'}</span>
+        </>}
+        <span className="muted">Matched</span>
+        <span>{bw
+          ? bw.clipped
+            ? `${fmtHz(bw.low)}–${fmtHz(bw.high)} and beyond (the whole range checked)`
+            : `${fmtHz(bw.low)}–${fmtHz(bw.high)} (${(bw.fractional * 100).toFixed(1)}%)`
+          : 'not at the design frequency'}</span>
       </div>
       {o.note && <div className="small">{o.note}</div>}
     </div>

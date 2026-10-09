@@ -9,6 +9,9 @@ export function fmtEng(v: number, unit = '', digits = 3): string {
   if (!Number.isFinite(v)) return v > 0 ? '∞' : v < 0 ? '−∞' : '—'
   if (v === 0) return `0 ${unit}`.trim()
   const a = Math.abs(v)
+  // Small parts the way RF engineers write them: 0.78 pF, not 780 fF; 0.23 nH, not 230 pH.
+  if (unit === 'F' && a >= 1e-14 && a < 1e-12 * 0.9995) return `${Number((v / 1e-12).toPrecision(digits))} pF`
+  if (unit === 'H' && a >= 1e-11 && a < 1e-9 * 0.9995) return `${Number((v / 1e-9).toPrecision(digits))} nH`
   const [mult, p] = PREFIXES.find(([m]) => a >= m * 0.9995) ?? PREFIXES[PREFIXES.length - 1]
   return `${Number((v / mult).toPrecision(digits))} ${p}${unit}`.trim()
 }

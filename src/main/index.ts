@@ -12,9 +12,11 @@ import type { SetupProgress, SetupResult } from '@shared/localModels'
 let win: BrowserWindow | null = null
 
 function createWindow() {
+  // SMITH_SIZE=1280x800: a dev aid for screenshots at other window sizes.
+  const [w, h] = (process.env.SMITH_SIZE ?? '').split('x').map(Number)
   win = new BrowserWindow({
-    width: 1560,
-    height: 960,
+    width: w || 1560,
+    height: h || 960,
     minWidth: 1100,
     minHeight: 700,
     title: 'Smith Chart Tutor',

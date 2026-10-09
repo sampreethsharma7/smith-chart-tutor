@@ -655,3 +655,12 @@ button.big { padding: 8px 12px; font-size: 14px; }
 .tutor.design .tutor-head { gap: 8px; }
 .tutor.design .tutor-head > div:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor.design .tutor-head button { white-space: nowrap; }
+.design-options-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.design-options-head b { white-space: nowrap; }
+.design-option-head { display: flex; align-items: flex-start; gap: 8px; }
+.design-option-head b { flex: 1; min-width: 0; }
+.design-option-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.design-option .recommended-chip { align-self: flex-start; }
+.design-metrics { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; }
+.design-metrics .good { color: var(--ok); }
+.design-metrics .bad { color: var(--bad); }

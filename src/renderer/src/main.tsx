@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { useStudio } from './state/studio'
 import { useTutor } from './agent/tutor'
-import { useDesigner } from './agent/designer'
+import { runDesignTool, useDesigner } from './agent/designer'
 import { useApp } from './state/app'
 import { useCalc } from './state/calc'
 import { findReach } from '@shared/rf/tasks'
@@ -24,7 +24,7 @@ if ((window as unknown as { smithDevHooks?: boolean }).smithDevHooks) {
     learnerTurns: () => 1,
     session: () => useTutor.getState().session
   }
-  Object.assign(window, { __smith: { useStudio, useTutor, useDesigner, useApp, useCalc, findReach, solveLMatch, toNetwork, loadImpedance, inputImpedance, tool: (name: string, args: Record<string, unknown>) => runTool(name, args, toolCtx as never) } })
+  Object.assign(window, { __smith: { useStudio, useTutor, useDesigner, runDesignTool, useApp, useCalc, findReach, solveLMatch, toNetwork, loadImpedance, inputImpedance, tool: (name: string, args: Record<string, unknown>) => runTool(name, args, toolCtx as never) } })
 }
 
 createRoot(document.getElementById('root')!).render(

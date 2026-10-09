@@ -19,6 +19,20 @@ async function readJson<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+/**
+ * Delete a file on purpose (a cleared chat, an ended lesson), with any temp files of interrupted
+ * saves next to it: otherwise the startup clean-up would "recover" one of those as the file.
+ * Waits for a save already on its way, so that can't bring it back either.
+ */
+async function removeFile(path: string) {
+  await (writing.get(path) ?? Promise.resolve()).catch(() => {})
+  await fs.rm(path, { force: true })
+  const dir = join(path, '..')
+  const base = path.slice(dir.length + 1)
+  const names = await fs.readdir(dir).catch(() => [] as string[])
+  await Promise.all(names.filter((n) => n.startsWith(`${base}.`) && n.endsWith('.tmp')).map((n) => fs.rm(join(dir, n), { force: true }).catch(() => {})))
+}
+
 const writing = new Map<string, Promise<void>>()
 let tmpSeq = 0
 
@@ -230,8 +244,8 @@ export async function deleteProfile(id: string) {
   deleted.add(safeId(id))
   await fs.rm(join(profilesDir(), `${safeId(id)}.json`), { force: true })
   await fs.rm(join(workspaceDir(), `${safeId(id)}.json`), { force: true })
-  await fs.rm(join(tutorDir(), `${safeId(id)}.json`), { force: true })
-  for (const part of DESIGN_PARTS) await fs.rm(designFile(id, part), { force: true })
+  await removeFile(join(tutorDir(), `${safeId(id)}.json`))
+  for (const part of DESIGN_PARTS) await removeFile(designFile(id, part))
 }
 
 // ---- per-profile chart workspace -------------------------------------------
@@ -253,7 +267,7 @@ export async function getConversation(profileId: string): Promise<unknown> {
 
 export async function saveConversation(profileId: string, c: unknown) {
   if (deleted.has(safeId(profileId))) return
-  if (c === null) await fs.rm(join(tutorDir(), `${safeId(profileId)}.json`), { force: true })
+  if (c === null) await removeFile(join(tutorDir(), `${safeId(profileId)}.json`))
   else await writeJson(join(tutorDir(), `${safeId(profileId)}.json`), c)
 }
 
@@ -271,7 +285,7 @@ export async function getDesign(profileId: string, part: string): Promise<unknow
 
 export async function saveDesign(profileId: string, part: string, data: unknown) {
   if (deleted.has(safeId(profileId))) return
-  if (data === null) await fs.rm(designFile(profileId, part), { force: true })
+  if (data === null) await removeFile(designFile(profileId, part))
   else await writeJson(designFile(profileId, part), data)
 }
 

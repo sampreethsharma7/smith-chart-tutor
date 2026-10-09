@@ -32,25 +32,34 @@ export interface DesignContext extends ToolContext {
 }
 
 /** The tutor's tools the design assistant shares, reworded for a colleague instead of a learner. */
-const SHARED: Record<string, string | null> = {
-  get_chart_state: null,
-  set_scenario: ' Do not replace the user\'s load (often their imported measured data) unless they ask you to; usually you only set the design frequency, band, markers or overlays.',
-  rf_calculate: null,
-  what_if: null,
-  analyze_sweep: null,
-  annotate_chart: null,
-  focus_chart: null,
-  clear_annotations: null
-}
+const SHARED = ['get_chart_state', 'set_scenario', 'rf_calculate', 'what_if', 'analyze_sweep', 'annotate_chart', 'focus_chart', 'clear_annotations']
 
 const reword = (s: string) => s
   .replace(/learner's/g, "user's").replace(/learner/g, 'user').replace(/Learner/g, 'User')
   .replace(/a lesson/g, 'a design').replace(/the lesson/g, 'the design').replace(/lessons/g, 'designs').replace(/lesson/g, 'design')
 
+/** Their load is theirs: the assistant can set up the view of the chart, never replace what they're matching. */
+const SCENARIO_DESCRIPTION = "Change how the user's chart is set up: Z0, design frequency, the band shown (show_band, sweep, markers) and overlays. It can't change their load or network: they set the load (or import their data) themselves, and designs go on the chart through the cards."
+
 function shared(): AgentTool[] {
-  return Object.entries(SHARED).flatMap(([name, extra]) => {
+  return SHARED.flatMap((name) => {
     const t = tutorTool(name)
-    return t ? [{ ...t, description: reword(t.description) + (extra ?? '') }] : []
+    if (!t) return []
+    // The tutor's wording (descriptions, parameter hints and results) reads as if to a colleague.
+    const params = JSON.parse(reword(JSON.stringify(t.parameters)))
+    const run: AgentTool['run'] = async (a, ctx) => {
+      const out = await t.run(a, ctx)
+      return typeof out === 'string' ? reword(out) : out
+    }
+    if (name !== 'set_scenario') return [{ ...t, description: reword(t.description), parameters: params, run }]
+    const { load: _load, clear_network: _clear, ...props } = params.properties
+    return [{
+      ...t, description: SCENARIO_DESCRIPTION, parameters: { ...params, properties: props },
+      run: (a, ctx) => {
+        const { load: _l, clear_network: _c, ...rest } = a ?? {}
+        return run(rest, ctx)
+      }
+    }]
   })
 }
 
@@ -89,6 +98,14 @@ function elementsOf(list: unknown, goal: DesignGoal): NetworkElement[] {
 }
 
 export const partsText = (els: NetworkElement[]) => els.map((e) => `${ELEMENT_LABEL[e.kind]} ${elementValueText(e)}`).join(' → ')
+
+const SHORT: Partial<Record<ElementKind, string>> = { tline: 'Line', openStub: 'Open stub', shortStub: 'Shorted stub' }
+/** The same, compact for a card: "Line 147.1° → Shorted stub 3.5° (Zc 50 Ω)". */
+export function cardPartsText(els: NetworkElement[]): string {
+  const zcs = [...new Set(els.filter((e) => SHORT[e.kind]).map((e) => e.zc ?? 50))]
+  const parts = els.map((e) => (SHORT[e.kind] ? `${SHORT[e.kind]} ${e.value.toFixed(1)}°` : `${ELEMENT_LABEL[e.kind]} ${elementValueText(e)}`)).join(' → ')
+  return zcs.length ? `${parts} (Zc ${zcs.join(', ')} Ω)` : parts
+}
 
 /** The numbers for the model: compact, and the same ones the user sees on the card. */
 export function resultBrief(r: DesignResult, goal: DesignGoal) {
@@ -164,13 +181,21 @@ const OWN: AgentTool[] = defineTools([
       const list = Array.isArray(a.options) ? a.options.slice(0, 4) : []
       if (!list.length) throw new Error('Give 1–4 options, each with a title and elements.')
       const s = ctx.studio
-      const options: DesignOption[] = list.map((o: any, i: number) => {
+      const all = list.map((o: any, i: number) => {
         const elements = elementsOf(o.elements, goal)
-        return { title: String(o.title ?? `Option ${i + 1}`).slice(0, 80), ...(o.note ? { note: String(o.note).slice(0, 240) } : {}), elements, result: evaluateDesign(s.load, s.datasets, elements, goal), ...(Number(a.recommended) === i + 1 ? { recommended: true } : {}) }
+        return { title: String(o.title ?? `Option ${i + 1}`).slice(0, 80), ...(o.note ? { note: String(o.note).slice(0, 240) } : {}), elements, result: evaluateDesign(s.load, s.datasets, elements, goal), ...(Number(a.recommended) === i + 1 ? { recommended: true } : {}) } as DesignOption
       })
+      // A "design" that doesn't match at the design frequency is a mistake (usually units: 2.64 for 2.64e-12 F), not an option.
+      const limit = Math.max(3, 2 * (goal.vswrMax ?? 2))
+      const options = all.filter((o: DesignOption) => o.result.vswr <= limit)
+      const dropped = all.filter((o: DesignOption) => !(o.result.vswr <= limit)).map((o: DesignOption) => `"${o.title}" (${partsText(o.elements)}: VSWR ${Number.isFinite(o.result.vswr) ? o.result.vswr.toFixed(1) : '∞'} at ${fmtHz(goal.f0)})`)
+      if (!options.length) throw new Error(`None of these is matched at ${fmtHz(goal.f0)}: ${dropped.join('; ')}. Values are SI units (2.64 pF is 2.64e-12, 3.3 nH is 3.3e-9); take them from match_options or check_network. Nothing was shown.`)
       d.propose({ id: uid('prop'), at: new Date().toISOString(), goal, options })
       return {
-        shown: options.map((o, i) => ({ option: i + 1, title: o.title, parts: partsText(o.elements), ...resultBrief(o.result, goal) })),
+        shown: options.map((o: DesignOption, i: number) => ({ option: i + 1, title: o.title, parts: partsText(o.elements), ...resultBrief(o.result, goal) })),
+        // Said plainly, so no reply can call a design broadband when the numbers say otherwise.
+        ...(goal.band ? { band_verdict: options.some((o: DesignOption) => o.result.band?.meets) ? `Options ${options.map((o: DesignOption, i: number) => (o.result.band?.meets ? i + 1 : 0)).filter(Boolean).join(', ')} meet the band target.` : `NONE of these meets VSWR ≤ ${goal.vswrMax ?? 2} across ${fmtHz(goal.band.low)}–${fmtHz(goal.band.high)}. Tell the user plainly, with the best worst-case VSWR, and what would help (a different design frequency, more sections, accepting a narrower band).` } : {}),
+        ...(dropped.length ? { not_shown: `Not matched at ${fmtHz(goal.f0)}, so left off the cards: ${dropped.join('; ')}. Check the values (SI units).` } : {}),
         note: 'The user sees these as cards with Apply buttons. Refer to them by number and title; don\'t repeat every number in your reply.'
       }
     }
