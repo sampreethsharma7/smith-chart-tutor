@@ -215,7 +215,8 @@ describe('the brief the tutor plans from', () => {
     expect(p.notes!.length).toBeLessThanOrEqual(5 * NOTES_PER_CATEGORY)
     const b = learnerBrief(p, at(50))
     // Bounded however long the history (each misconception also carries its sign-off status and score).
-    expect(b.text.length).toBeLessThan(6500)
+    // The independence ladder adds a fixed line per ladder skill (about 700 characters).
+    expect(b.text.length).toBeLessThan(7300)
     expect(JSON.stringify(p.topics).length).toBeLessThan(8000)
   })
 })
@@ -269,6 +270,8 @@ describe('export and reset', () => {
     expect(back.observations).toEqual(p.observations)
     expect(back.misconceptions).toEqual(p.misconceptions)
     expect(back.topics).toEqual(p.topics)
+    expect(back.ladder).toEqual(p.ladder)
+    expect(back.ladderPace).toEqual(p.ladderPace)
   })
 
   it('reset clears what the app learned and keeps who they are and how they like to learn', () => {
@@ -277,7 +280,7 @@ describe('export and reset', () => {
     expect(r).toMatchObject({ id: p.id, name: p.name, createdAt: p.createdAt, background: p.background, preferences: p.preferences, setupComplete: true })
     expect(r.skills).toEqual(createProfile('x', { experience: 'intermediate' }).skills) // back to their stated experience
     for (const k of ['sessions', 'misconceptions'] as const) expect(r[k]).toEqual([])
-    for (const k of ['topics', 'answers', 'observations', 'calibration', 'slips', 'notes', 'nextFocus', 'assessment', 'asked'] as const) expect(r[k]).toBeUndefined()
+    for (const k of ['topics', 'answers', 'observations', 'calibration', 'slips', 'notes', 'nextFocus', 'assessment', 'asked', 'ladder', 'ladderPace'] as const) expect(r[k]).toBeUndefined()
     const brief = learnerBrief(r, at(3)).text
     expect(brief).not.toMatch(/shunt C|2\.4 GHz/) // the mistake and the tutor's note are gone
     expect(brief).toMatch(/Goals: Match my patch antenna/) // their own goal stays

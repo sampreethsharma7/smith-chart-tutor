@@ -7,6 +7,7 @@
  */
 import { ANSWER_LOG_MAX, applyEvidence, lessonsOf, SKILLS, type Misconception, type Outcome, type Profile, type SkillId, type Sure } from './profile'
 import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOff } from './signoff'
+import { ladderBrief, moveOnLadder, type Rung } from './ladder'
 
 // ── Topics: the specific things a learner can be good or shaky at ───────────
 
@@ -46,7 +47,14 @@ export type Difficulty = 1 | 2 | 3
  * by the model). ctx: the situation it was asked in (e.g. "upper half"), so a topic only
  * counts as solid once it has been right in more than one.
  */
-export interface GradedMeta { topic: TopicId; skill: SkillId; difficulty: Difficulty; ctx?: string }
+export interface GradedMeta {
+  topic: TopicId
+  skill: SkillId
+  difficulty: Difficulty
+  ctx?: string
+  /** How much of it the learner decides (ladder.ts), for skills on the ladder */
+  rung?: Rung
+}
 
 /** How the answer was given: a pick from choices proves less than a click, a value or a task. */
 export type AnswerFormat = 'mcq' | 'click' | 'value' | 'task'
@@ -108,11 +116,15 @@ export function classifyReach(kinds: string[], toAdd: number, pointTarget: boole
   return meta(topic, toAdd >= 2 || pointTarget ? 3 : 2)
 }
 
-export function classifyMatch(kinds: string[], maxVswr: number, band: boolean): GradedMeta {
+/**
+ * guided: the instructions name the parts to use. Restricting the parts is then help, not a
+ * constraint, so it doesn't make the match "tight" (the ladder counts the guidance: ladder.ts).
+ */
+export function classifyMatch(kinds: string[], maxVswr: number, band: boolean, guided = false): GradedMeta {
   if (band) return meta('band_match', 3)
   if (kinds.some(isStub)) return meta('stub_match', 3)
   if (kinds.length && kinds.every((k) => k === 'tline')) return meta('reach_line', 3)
-  const restricted = kinds.length > 0 && kinds.filter((k) => LUMPED.includes(k)).length < 4
+  const restricted = !guided && kinds.length > 0 && kinds.filter((k) => LUMPED.includes(k)).length < 4
   return maxVswr <= 1.2 || restricted ? meta('l_match_tight', 3) : meta('l_match', 2)
 }
 
@@ -344,16 +356,22 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
   const situations = new Set(topic.rightIn.map((e) => e.ctx ?? ''))
   if (clean && situations.size < 2) notes.push(`all their right answers on this topic are in one situation${m.ctx ? ` (${m.ctx})` : ''}: next time change it (other half of the chart, other side of r = 1, other quantity)`)
   if (fragile) notes.push('right, but they weren\'t sure: it comes back for review soon and isn\'t proof yet')
+  // The independence ladder (ladder.ts): how much of a task they decide themselves.
+  const step = moveOnLadder(p, m, outcome, r.sure, fragile, at)
+  if (step?.note) notes.push(`independence ladder: ${m.skill} ${step.note}`)
 
   const profile: Profile = {
     ...p,
     skills: { ...p.skills, [m.skill]: skill },
     topics: { ...(p.topics ?? {}), [m.topic]: topic },
+    ...(step ? { ladder: { ...(p.ladder ?? {}), [m.skill]: step.state } } : {}),
+    ...(step?.pace !== undefined ? { ladderPace: [...(p.ladderPace ?? []), step.pace].slice(-12) } : {}),
     misconceptions,
     ...(r.sure ? { calibration: [...(p.calibration ?? []), { sure: r.sure, right: r.outcome === 'correct', at, topic: m.topic }].slice(-80) } : {}),
     answers: [...(p.answers ?? []), {
       at, session: r.session, topic: m.topic, skill: m.skill, difficulty: m.difficulty, outcome: r.outcome,
-      ...(r.sure ? { sure: r.sure } : {}), ...(r.helped ? { helped: true } : {}), ...(r.format ? { format: r.format } : {}), ...(m.ctx ? { ctx: m.ctx } : {})
+      ...(r.sure ? { sure: r.sure } : {}), ...(r.helped ? { helped: true } : {}), ...(r.format ? { format: r.format } : {}), ...(m.ctx ? { ctx: m.ctx } : {}),
+      ...(m.rung ? { rung: m.rung } : {})
     }].slice(-ANSWER_LOG_MAX)
   }
   const name = topicDef(m.topic)!.name
@@ -475,6 +493,7 @@ export function learnerBrief(p: Profile, now: string): BriefParts {
     const aim = own.length ? Math.round(own.reduce((a, [, t]) => a + t.level, 0) / own.length) : st.mastery < 0.4 ? 1 : st.mastery < 0.7 ? 2 : 3
     lines.push(`- ${s.id} ${st.mastery.toFixed(2)}${trend} · aim level ${aim}${st.evidence < 3 ? ' · little evidence yet' : ''}`)
   }
+  lines.push(ladderBrief(p, now))
 
   const due = topics.filter(([, t]) => t.due <= now).sort((a, b) => a[1].box - b[1].box || a[1].due.localeCompare(b[1].due)).map(([id]) => id)
   const weak = topics.filter(([, t]) => topicState(t) === 'shaky').sort((a, b) => pct(a[1]) - pct(b[1])).map(([id]) => id)

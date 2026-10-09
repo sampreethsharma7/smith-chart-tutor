@@ -891,3 +891,104 @@ describe('adaptive sign-off: the tutor logs the reason and transfer; the app dec
     expect(app.profile.misconceptions).toHaveLength(0)
   })
 })
+
+describe('independence ladder: the tools work out each item\'s rung and hold the tutor to the learner\'s', () => {
+  const AT = new Date().toISOString()
+  const onRung = (skill: string, rung: number, extra = {}) => {
+    app.profile = { ...app.profile, ladder: { ...(app.profile.ladder ?? {}), [skill]: { rung, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT, ...extra } } }
+  }
+  const NAMED_TASK = { title: 'Onto r = 1', instructions: 'Add a shunt capacitor until the point lands on the r = 1 circle.', target: { circle: { family: 'r', value: 1 } } }
+  const OPEN_TASK = { title: 'Onto r = 1', instructions: 'Use one part of your choice to land on the r = 1 circle.', target: { circle: { family: 'r', value: 1 } } }
+
+  it('refuses a guided task two steps below their rung, and leaves the chart as it was', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: 0 } })
+    onRung('lumped_moves', 5) // judge: guided is two steps below on this skill (1, 2, 5)
+    useStudio.getState().addElement('seriesL', 1e-9)
+    const r = await runTool('create_target_task', NAMED_TASK, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/Too easy for them: this item is rung 1 \(guided\), and they're lumped_moves at rung 5 \(judge\)/)
+    expect(r.content).toMatch(/have them judge a worked solution \(ask_spot_error\)/)
+    expect(useStudio.getState().exercise).toBeNull()
+    expect(useStudio.getState().network.map((e) => e.kind)).toEqual(['seriesL']) // not cleared
+  })
+
+  it('a task that leaves the part to them is one choice: one step below judge, allowed', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: 0 } })
+    onRung('lumped_moves', 5)
+    const r = await runTool('create_target_task', OPEN_TASK, ctx)
+    expect(r.isError).toBe(false)
+    expect(r.content).toMatch(/Independence: rung 2 \(one choice\); they're lumped_moves at rung 5 \(judge\): one step below, fine as a warm-up/)
+    expect(useStudio.getState().exercise?.graded).toMatchObject({ skill: 'lumped_moves', rung: 2 })
+  })
+
+  it('a reason gets an easy item through, once a lesson, and the lesson keeps count', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: 0 } })
+    onRung('lumped_moves', 5)
+    let session: any = { id: 'L9', rungOverrides: [] }
+    const inLesson = { ...ctx, session: () => session, updateSession: (fn: (s: any) => any) => { session = fn(session) } }
+    const first = await runTool('create_target_task', { ...NAMED_TASK, rung_reason: 'warm_up' }, inLesson)
+    expect(first.isError).toBe(false)
+    expect(first.content).toMatch(/below their rung 5 \(warm up: 0 more like this allowed this lesson\)/)
+    expect(session.rungOverrides).toMatchObject([{ reason: 'warm_up', skill: 'lumped_moves' }])
+    const second = await runTool('create_target_task', { ...NAMED_TASK, rung_reason: 'warm_up' }, inLesson)
+    expect(second.isError).toBe(true)
+    expect(second.content).toMatch(/already used 1× this lesson/)
+  })
+
+  it('a clean pass on a stretch task moves them up, and the answer keeps its rung', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 30, X: 20 } })
+    onRung('lumped_moves', 1, { provisional: true, source: 'start' })
+    await runTool('create_target_task', { title: 'Onto g = 1', instructions: 'One series element.', target: { circle: { family: 'g', value: 1 } }, allowed_kinds: ['seriesL', 'seriesC'] }, ctx)
+    expect(useStudio.getState().exercise?.graded?.rung).toBe(2)
+    const sol = findReach(c(30, 20), parseTarget({ circle: { family: 'g', value: 1 } }), ['seriesL', 'seriesC'], 1, F, 50).network[0]
+    useStudio.getState().addElement(sol.kind, sol.value)
+    script.push(text('Nice.'))
+    expect((await checkExerciseAsync())?.passed).toBe(true)
+    await idle()
+    expect(app.profile.ladder.lumped_moves).toMatchObject({ rung: 2, provisional: false })
+    expect(app.profile.answers.at(-1)).toMatchObject({ topic: 'reach_lumped', rung: 2, outcome: 'correct' })
+    expect(lastUserText(requests[0])).toMatch(/independence ladder: lumped_moves passed a harder item cleanly: rung 1 \(guided\) → rung 2 \(one choice\)/)
+  })
+
+  it('questions get their rungs: a move with its reason is one choice, spot the mistake is judge, a part and its value is one choice', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 30, X: 20 } })
+    await runTool('ask_move', { element: { kind: 'shuntC' }, from: 'load' }, ctx)
+    expect(useStudio.getState().prediction?.graded).toMatchObject({ skill: 'lumped_moves', rung: 2 })
+    await runTool('ask_move', { element: { kind: 'shuntC' }, from: 'load', with_reason: false }, ctx)
+    expect(useStudio.getState().prediction?.graded?.rung).toBe(1)
+    await runTool('ask_spot_error', { mistake: 'direction' }, ctx)
+    expect(useStudio.getState().prediction?.graded?.rung).toBe(5)
+    await runTool('ask_component', { question: 'Which part adds x = 1 in series?', connection: 'series', amount: 1 }, ctx)
+    expect(useStudio.getState().prediction?.graded).toMatchObject({ skill: 'l_match', rung: 2 })
+    // Reading questions have no rung.
+    await runTool('ask_value', { question: 'VSWR?', quantity: 'vswr', from: 'load' }, ctx)
+    expect(useStudio.getState().prediction?.graded?.rung).toBeUndefined()
+    await runTool('ask_locate', { question: 'Click z = 1 + j1', point: { r: 1, x: 1 } }, ctx)
+    expect(useStudio.getState().prediction?.graded?.rung).toBeUndefined()
+    await runTool('ask_locate', { question: 'Where does 2 pF of shunt C take the load?', element: { kind: 'shuntC', value: 2e-12 }, from: 'load' }, ctx)
+    expect(useStudio.getState().prediction?.graded?.rung).toBe(1)
+  })
+
+  it('a full match: naming the parts makes it one choice (help, not a "tight" constraint); a band makes it constrained', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: 0 } })
+    const named = await runTool('create_exercise', { title: 'Match it', instructions: 'Build it with a shunt C, then a series L.', freq_hz: F, max_vswr: 1.5, allowed_kinds: ['shuntC', 'seriesL'] }, ctx)
+    expect(named.content).not.toMatch(/^Error/)
+    expect(useStudio.getState().exercise?.graded).toMatchObject({ topic: 'l_match', difficulty: 2, rung: 2 })
+    const open = await runTool('create_exercise', { title: 'Match it', instructions: 'Match this load to VSWR ≤ 1.5.', freq_hz: F, max_vswr: 1.5 }, ctx)
+    expect(open.isError).toBe(false)
+    expect(useStudio.getState().exercise?.graded).toMatchObject({ topic: 'l_match', rung: 3 })
+    const band = await runTool('create_exercise', { title: 'Across the band', instructions: 'Keep VSWR ≤ 1.5 from 2.3 to 2.5 GHz.', freq_hz: F, max_vswr: 1.5, band_low_hz: 2.3e9, band_high_hz: 2.5e9 }, ctx)
+    expect(band.isError).toBe(false)
+    expect(useStudio.getState().exercise?.graded).toMatchObject({ topic: 'band_match', skill: 'q_bandwidth', rung: 4 })
+  })
+
+  it('a full match refused for being too easy leaves the chart and load untouched', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: 0 } })
+    onRung('l_match', 4)
+    const r = await runTool('create_exercise', { title: 'Match it', instructions: 'Build it with a shunt C, then a series L.', freq_hz: F, max_vswr: 1.5, scenario: { load: { kind: 'fixed', R: 25, X: 25 } } }, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/Too easy for them: this item is rung 2 \(one choice\), and they're l_match at rung 4 \(constrained\)/)
+    expect(useStudio.getState().exercise).toBeNull()
+    expect(useStudio.getState().load).toMatchObject({ kind: 'fixed', R: 100, X: 0 })
+  })
+})

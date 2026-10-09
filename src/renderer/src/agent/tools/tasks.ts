@@ -11,6 +11,8 @@ import { MISTAKE_CONFUSION } from '@shared/patterns'
 import { fmtEng, fmtHz } from '@/lib/format'
 import { aimFor, classifyLocate, classifyMove, classifyReach, classifyValue, inSituation, noteAsked, topicDef, type GradedMeta, type TopicId } from '@shared/memory'
 import { uid } from '@/state/studio'
+import { RUNG_COMPONENT, RUNG_SPOT, rungOfMove, rungOfReach, withRung } from '@shared/ladder'
+import { fitRung, RUNG_REASON } from '../ladderFit'
 import { defineTools, type ToolContext } from '../types'
 import { applyScenario, ELEMENT_KINDS, SCENARIO_PROPS } from './chart'
 import { typicalValue } from './compute'
@@ -114,7 +116,8 @@ export default defineTools([
         show_target: { type: 'boolean', description: 'Draw the target on the chart (default true). Set false when finding it is part of the task.' },
         freq_hz: { type: 'number', description: 'Default: the design frequency' },
         skill: { type: 'string', description: 'Skill id this practises' },
-        scenario: { type: 'object', properties: SCENARIO_PROPS, description: 'Optional chart setup first (a new load starts fresh)' }
+        scenario: { type: 'object', properties: SCENARIO_PROPS, description: 'Optional chart setup first (a new load starts fresh)' },
+        ...RUNG_REASON
       },
       required: ['title', 'instructions', 'target']
     },
@@ -146,8 +149,12 @@ export default defineTools([
         if (!found.ok && toAdd <= 2) {
           throw new Error(`Not possible: with up to ${toAdd} of ${kinds.map((k) => ELEMENT_LABEL[k]).join(', ')} (practical values) the point z = ${fmtNorm(z)} can't reach ${describeTarget(target)}. Allow other element kinds or more elements, or pick a target on a circle the point can move along.`)
         }
+        const graded = withRung(
+          inSituation(classifyReach(kinds, toAdd, target.type === 'point'), `${regionOf(z)} → ${target.type === 'point' ? 'a point' : `a ${target.family} circle`}`),
+          rungOfReach(Array.isArray(a.allowed_kinds) ? kinds : undefined, String(a.instructions))
+        )
+        const fit = fitRung(ctx, graded, a.rung_reason)
         s.setAnnotations(() => [])
-        const graded = inSituation(classifyReach(kinds, toAdd, target.type === 'point'), `${regionOf(z)} → ${target.type === 'point' ? 'a point' : `a ${target.family} circle`}`)
         s.setExercise({
           id: uid('ex'),
           kind: 'reach',
@@ -167,7 +174,7 @@ export default defineTools([
         const sol = found.ok
           ? `One solution (FOR YOUR VERIFICATION ONLY, never reveal unprompted): ${found.network.map((e) => `${ELEMENT_LABEL[e.kind]} ${valueText(e.kind, e.value)}`).join(' → ')}.`
           : 'No solution found with two elements; more may be needed.'
-        return `Task card shown: get the point from z = ${fmtNorm(z)} onto ${describeTarget(target)} (±${target.tol}). ${sol}${remember(ctx, graded, 'reach', String(a.title))} Now wait for the learner; their Check results come to you.`
+        return `Task card shown: get the point from z = ${fmtNorm(z)} onto ${describeTarget(target)} (±${target.tol}). ${sol}${remember(ctx, graded, 'reach', String(a.title))}${fit} Now wait for the learner; their Check results come to you.`
       } catch (e) {
         ctx.studio.loadSnapshot(before)
         throw e
@@ -186,7 +193,8 @@ export default defineTools([
         ...FROM,
         tolerance: { type: 'number', description: 'Allowed distance in Γ (default 0.06; the chart radius is 1)' },
         title: { type: 'string', description: 'Short name for the lesson record' },
-        skill: { type: 'string' }
+        skill: { type: 'string' },
+        ...RUNG_REASON
       },
       required: ['question']
     },
@@ -208,14 +216,17 @@ export default defineTools([
       }
       if (!z) throw new Error('Give "point" ({r, x} or {g, b}) or "element" (with optional "from").')
       if (!insideChart(z)) throw new Error('That spot is off the chart (or at the open/short): pick another.')
+      // Where a named part takes the point: a prediction about it (guided). A plain point is reading: no rung.
       graded = inSituation(graded!, `${regionOf(z)}, ${a.element ? 'after an element' : typeof a.point?.g === 'number' ? 'given as y' : 'given as z'}`)
+      if (a.element) graded = withRung(graded, 1)
+      const fit = fitRung(ctx, graded, a.rung_reason)
       const tol = Number.isFinite(a.tolerance) && a.tolerance > 0 ? Math.min(a.tolerance, 0.3) : 0.06
       const targetText = `${what} (y = ${fmtNorm(admittanceOf(z))})`
       s.setPrediction({
         id: uid('q'), question: String(a.question), kind: 'click', title: a.title ?? short(String(a.question)), skill: a.skill,
         key: { type: 'locate', target: gammaFromZ(z, 1), tol, targetText }, graded
       })
-      return `Question card shown; the learner will click on the chart. The answer is ${targetText} (don't reveal it). The app grades the click and tells you how far off it is.${remember(ctx, graded!, 'locate', String(a.question))}`
+      return `Question card shown; the learner will click on the chart. The answer is ${targetText} (don't reveal it). The app grades the click and tells you how far off it is.${remember(ctx, graded!, 'locate', String(a.question))}${fit}`
     }
   },
   {
@@ -230,7 +241,8 @@ export default defineTools([
         with_reason: { type: 'boolean', description: 'path only. Default true: after the direction they also pick WHY (what the element adds), from reasons the app builds; a right direction for the wrong reason counts as partly right and shows the wrong idea. Set false only for a quick warm-up.' },
         question: { type: 'string', description: 'Optional wording; default asks how the element moves the point' },
         title: { type: 'string' },
-        skill: { type: 'string' }
+        skill: { type: 'string' },
+        ...RUNG_REASON
       },
       required: ['element']
     },
@@ -251,13 +263,14 @@ export default defineTools([
       const question = a.question ? String(a.question)
         : ask === 'end_half' ? `If you add a ${ELEMENT_LABEL[el.kind]}${sized} to ${what}, where does the point end up?`
           : `If you add a ${ELEMENT_LABEL[el.kind]} to ${what}, how does the point move?`
-      const graded = inSituation(classifyMove(el.kind, ask, withReason), `from the ${q.startHalf === 'on the real axis' ? 'real axis' : `${q.startHalf} half`}${ask === 'end_half' ? ', where it ends' : ''}`)
+      const graded = withRung(inSituation(classifyMove(el.kind, ask, withReason), `from the ${q.startHalf === 'on the real axis' ? 'real axis' : `${q.startHalf} half`}${ask === 'end_half' ? ', where it ends' : ''}`), rungOfMove(withReason))
+      const fit = fitRung(ctx, graded, a.rung_reason)
       s.setPrediction({
         id: uid('q'), question, kind: 'mcq', choices: q.choices, title: a.title ?? short(question), skill: a.skill,
         key: { type: 'move', choices: q.choices, correct: q.correct, facts: q.facts, ...(withReason ? { reasons: q.reasons } : {}) }, graded
       })
       const why = withReason ? ` Then they pick why: ${q.reasons!.choices.map((x, i) => `${i === q.reasons!.correct ? '[right] ' : ''}"${x}"`).join(', ')}.` : ''
-      return `Question card shown with choices: ${q.choices.map((x, i) => `${i === q.correct ? '[right] ' : ''}"${x}"`).join(', ')}.${why} Verified move: ${q.facts}${remember(ctx, graded, 'move', question)} Wait for their answer; the app grades it.`
+      return `Question card shown with choices: ${q.choices.map((x, i) => `${i === q.correct ? '[right] ' : ''}"${x}"`).join(', ')}.${why} Verified move: ${q.facts}${remember(ctx, graded, 'move', question)}${fit} Wait for their answer; the app grades it.`
     }
   },
   {
@@ -309,7 +322,8 @@ export default defineTools([
       properties: {
         mistake: { type: 'string', enum: [...MISTAKES, 'any'], description: 'Which mistake to plant; default "any" (the app picks, and "none" comes up sometimes)' },
         from_point: { ...POINT, description: 'Optional: match this normalized load instead of the current one' },
-        title: { type: 'string' }
+        title: { type: 'string' },
+        ...RUNG_REASON
       }
     },
     activity: () => 'Asking you to check a worked solution',
@@ -323,14 +337,15 @@ export default defineTools([
       const mistake: Mistake = (MISTAKES as readonly string[]).includes(a.mistake) ? a.mistake : MISTAKES[Math.floor(Math.random() * MISTAKES.length)]
       const q = spotQuestion(ZL, s.z0, f, mistake)
       const topic = q.topic as TopicId
-      const graded = inSituation({ topic, skill: topicDef(topic)!.skill, difficulty: q.difficulty }, `spot the mistake: ${mistake}`)
+      const graded = withRung(inSituation({ topic, skill: topicDef(topic)!.skill, difficulty: q.difficulty }, `spot the mistake: ${mistake}`), RUNG_SPOT)
+      const fit = fitRung(ctx, graded, a.rung_reason)
       const question = q.body
       s.setPrediction({
         id: uid('q'), question, kind: 'mcq', choices: q.choices, title: a.title ?? 'Spot the mistake in a worked match',
         key: { type: 'pick', choices: q.choices, correct: q.correct, facts: q.facts, ideas: q.choices.map((_, i) => (i === 4 && q.missedIdea ? q.missedIdea : '')), missed: MISTAKE_CONFUSION[mistake] },
         graded
       })
-      return `Question card shown: a worked match with ${mistake === 'none' ? 'NO mistake' : `a mistake in ${q.choices[q.correct]}`} (don't reveal it). ${q.facts}${remember(ctx, graded, 'spot', 'Spot the mistake')} Wait for their answer; the app grades it.`
+      return `Question card shown: a worked match with ${mistake === 'none' ? 'NO mistake' : `a mistake in ${q.choices[q.correct]}`} (don't reveal it). ${q.facts}${remember(ctx, graded, 'spot', 'Spot the mistake')}${fit} Wait for their answer; the app grades it.`
     }
   },
   {
@@ -348,7 +363,8 @@ export default defineTools([
         from_point: { ...POINT, description: 'Instead of amount: the start point ({r, x} or {g, b})' },
         to_point: { ...POINT, description: 'Instead of amount: where the part must take it' },
         tolerance_pct: { type: 'number', description: 'Default 5; 2–15' },
-        title: { type: 'string' }
+        title: { type: 'string' },
+        ...RUNG_REASON
       },
       required: ['question', 'connection']
     },
@@ -368,14 +384,15 @@ export default defineTools([
       const tolPct = Number.isFinite(a.tolerance_pct) ? Math.min(15, Math.max(2, a.tolerance_pct)) : 5
       const part = r.component.kind.endsWith('L') ? 'L' : 'C'
       const sign = r.component.kind.endsWith('L') === (conn === 'series') ? 'positive' : 'negative'
-      const graded = inSituation({ topic: 'part_value', skill: 'l_match', difficulty: conn === 'series' ? 2 : 3 }, `${conn}, ${sign} ${conn === 'series' ? 'x' : 'b'}`)
+      const graded = withRung(inSituation({ topic: 'part_value', skill: 'l_match', difficulty: conn === 'series' ? 2 : 3 }, `${conn}, ${sign} ${conn === 'series' ? 'x' : 'b'}`), RUNG_COMPONENT)
+      const fit = fitRung(ctx, graded, a.rung_reason)
       const working = r.steps.map((x) => x.label).join(' → ')
       s.setPrediction({
         id: uid('q'), question: String(a.question), kind: 'text', hint: 'value with its unit, e.g. 2.7 nH or 1.1 pF', title: a.title ?? short(String(a.question)),
         key: { type: 'component', part, value: r.component.value, tolPct, z0: s.z0, facts: `Exact: ${r.component.text} (${r.outputs.map((o) => `${o.label} ${o.text}`).join('; ')}).` },
         graded
       })
-      return `Question card shown. Exact answer (don't reveal it): ${r.component.text}; the working: ${working}. The app grades their typed value (±${tolPct}%) and names the slip if it's a classic one.${remember(ctx, graded, 'component', String(a.question))} Wait for their answer.`
+      return `Question card shown. Exact answer (don't reveal it): ${r.component.text}; the working: ${working}. The app grades their typed value (±${tolPct}%) and names the slip if it's a classic one.${remember(ctx, graded, 'component', String(a.question))}${fit} Wait for their answer.`
     }
   }
 ])

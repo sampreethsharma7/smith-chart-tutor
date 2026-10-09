@@ -8,6 +8,8 @@ import { defineTools } from '../types'
 import { applyScenario, ELEMENT_KINDS, SCENARIO_PROPS } from './chart'
 import { aimFor, classifyMatch, inSituation, noteAsked, recordGraded, topicDef } from '@shared/memory'
 import { regionOf } from '@shared/rf/tasks'
+import { matchIsGuided, rungOfMatch, withRung } from '@shared/ladder'
+import { fitRung, RUNG_REASON } from '../ladderFit'
 
 export default defineTools([
   {
@@ -25,7 +27,8 @@ export default defineTools([
         band_high_hz: { type: 'number' },
         max_elements: { type: 'number' },
         allowed_kinds: { type: 'array', items: { type: 'string', enum: ELEMENT_KINDS } },
-        scenario: { type: 'object', properties: SCENARIO_PROPS, description: 'Chart setup for the exercise (network is cleared automatically)' }
+        scenario: { type: 'object', properties: SCENARIO_PROPS, description: 'Chart setup for the exercise (network is cleared automatically)' },
+        ...RUNG_REASON
       },
       required: ['title', 'instructions', 'freq_hz', 'max_vswr']
     },
@@ -68,7 +71,19 @@ export default defineTools([
       const maxVswr = Number.isFinite(a.max_vswr) && a.max_vswr > 1 ? a.max_vswr : 1.5
       const band = !!(a.band_low_hz && a.band_high_hz)
       const ZL = ctx.derived().design.load.z
-      const graded = inSituation(classifyMatch(Array.isArray(a.allowed_kinds) ? a.allowed_kinds : [], maxVswr, band), `${regionOf(ZL)}, ${band ? 'across a band' : 'one frequency'}`)
+      const kindsGiven = Array.isArray(a.allowed_kinds) ? a.allowed_kinds : undefined
+      const instructions = String(a.instructions ?? '')
+      const graded = withRung(
+        inSituation(classifyMatch(kindsGiven ?? [], maxVswr, band, matchIsGuided(kindsGiven, instructions)), `${regionOf(ZL)}, ${band ? 'across a band' : 'one frequency'}`),
+        rungOfMatch(kindsGiven, maxVswr, band, instructions)
+      )
+      let fit: string
+      try {
+        fit = fitRung(ctx, graded, a.rung_reason)
+      } catch (e) {
+        s.loadSnapshot({ ...before }) // refused: leave the chart as it was
+        throw e
+      }
       ctx.updateProfile?.((p) => noteAsked(p, { at: new Date().toISOString(), topic: graded.topic, difficulty: graded.difficulty, kind: 'match', text: String(a.title) }))?.catch?.(() => {})
       const aim = ctx.profile?.() ? aimFor(ctx.profile(), graded.topic) : undefined
       s.setExercise({
@@ -86,7 +101,7 @@ export default defineTools([
         status: 'active',
         hints: []
       })
-      return `Exercise card shown. Practises: ${topicDef(graded.topic)!.name} (${graded.topic}), level ${graded.difficulty}${aim !== undefined ? `; their aim for it is ${aim}` : ''}. Now wait for the learner to work on it; they will press Check or talk to you.`
+      return `Exercise card shown. Practises: ${topicDef(graded.topic)!.name} (${graded.topic}), level ${graded.difficulty}${aim !== undefined ? `; their aim for it is ${aim}` : ''}.${fit} Now wait for the learner to work on it; they will press Check or talk to you.`
     }
   },
   {

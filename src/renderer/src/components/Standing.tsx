@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import type { Profile } from '@shared/profile'
+import type { Profile, SkillId } from '@shared/profile'
 import { skillName } from '@shared/profile'
 import { calibrationOf } from '@shared/memory'
+import { ladderLine } from '@shared/ladder'
 import { startLesson } from '@/state/journey'
 import {
   BENCHMARKS, overall, plannedFocus, probeTargets, skillStanding, topicStanding, ZONES,
@@ -90,6 +91,7 @@ export function Standing({ profile }: { profile: Profile }) {
           <div key={r.id} className={`ladder-row ${r.status}`}>
             <span className="ladder-name" title={r.status === 'locked' ? `Builds on ${r.needs.map(skillName).join(' and ')}` : undefined}>
               {r.status === 'locked' && '🔒 '}{r.name}
+              <Independence profile={profile} skill={r.id} />
             </span>
             <Track r={r} />
             <TopicSquares topics={topics.filter((t) => t.skill === r.id)} />
@@ -101,6 +103,14 @@ export function Standing({ profile }: { profile: Profile }) {
       <SelfJudgement profile={profile} />
     </div>
   )
+}
+
+/** How much of a task they do on their own in this skill (the independence ladder), and the next step up. */
+function Independence({ profile, skill }: { profile: Profile; skill: SkillId }) {
+  const l = ladderLine(profile, skill)
+  if (!l) return null
+  const title = `How much of each task you decide yourself: your tutor pitches tasks here${l.provisional ? ' (an estimate until your next answer in this skill)' : ''}.${l.next ? ` Next step up: ${l.next}.` : ''}`
+  return <span className="ladder-indep" title={title}>Now: {l.now}{l.provisional ? ' (estimate)' : ''}</span>
 }
 
 /** The facts behind a pick, from the same numbers as the bars below. */

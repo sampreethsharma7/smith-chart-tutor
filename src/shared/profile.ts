@@ -3,6 +3,7 @@ import type { Answer, Question } from './assessment'
 import type { AskedItem, Note, TopicId, TopicStat } from './memory'
 import type { Slip } from './patterns'
 import type { Observation } from './signoff'
+import { rebuildLadder, type LadderState, type Rung } from './ladder'
 
 export type SkillId =
   | 'chart_basics'
@@ -109,6 +110,8 @@ export interface SessionRecord {
   transcript: Array<{ role: 'user' | 'tutor'; text: string; at: string; /** model that wrote a tutor message */ model?: string }>
   /** Tutor models used in this lesson, in order (more than one = switched mid-lesson) */
   models?: string[]
+  /** Items set 2+ rungs below the learner on the independence ladder, with the reason given (ladder.ts allows a few a lesson) */
+  rungOverrides?: Array<{ reason: string; skill: SkillId; at: string }>
   /** Graded tasks and questions: kind is match / reach (task cards) or locate / move / value (questions); older records have none */
   exercises: Array<{ id?: string; kind?: string; title: string; skill?: SkillId; passed: boolean; attempts: number; at: string }>
 }
@@ -211,6 +214,10 @@ export interface Profile {
    * pick lives: the tutor plans from it, Progress and the lesson launcher show it.
    */
   nextFocus?: NextFocus
+  /** Per skill: how much of a task they decide themselves, kept by the app (ladder.ts) */
+  ladder?: Partial<Record<SkillId, LadderState>>
+  /** How many answers their past climbs up the ladder took, newest last: their pace, on any skill */
+  ladderPace?: number[]
 }
 
 export interface NextFocus {
@@ -275,7 +282,9 @@ export function migrateProfile(p: Profile): Profile {
     sessions: p.sessions ?? [],
     ...migrateNotes(p),
     ...rescore(p, skills),
-    ...(p.topics ? { topics: migrateTopics(p.topics) } : {})
+    ...(p.topics ? { topics: migrateTopics(p.topics) } : {}),
+    // Saved before the ladder: rungs estimated from the answers they already gave (provisional).
+    ...(p.ladder ? {} : rebuildLadder({ ...base, ...p, skills }))
   }
 }
 
@@ -330,6 +339,8 @@ export interface AnswerRecord {
   format?: string
   /** The situation it was in (e.g. upper half, r < 1) */
   ctx?: string
+  /** Its rung on the independence ladder (ladder.ts); absent before the ladder and for reading items */
+  rung?: Rung
 }
 
 export const ANSWER_LOG_MAX = 1000

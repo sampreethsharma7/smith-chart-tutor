@@ -284,6 +284,13 @@ The app keeps it, so it's the same whichever model teaches, and it stays small h
   - the topic's **next review date**: tomorrow after a miss, then 3, 7, 14 and 30 days as you keep getting it right
 
   The tutor can't record the same answer again. Its own `record_evidence` is for what can't be graded, such as explanations and reasoning.
+- **The independence ladder** ([ladder.ts](../src/shared/ladder.ts)) measures something difficulty doesn't: how much of a task you decide yourself. A hard problem with the part named is still guided.
+  - **The rungs:** 1 guided (the part and target are given), 2 one choice (you pick the part, or its value), 3 unguided (a load and a goal), 4 constrained (a band, a tight VSWR, fewer parts), 5 judge (find the mistake in a worked match). Each skill has the rungs it has items for: single moves go guided, one choice, judge; L-matching has all five.
+  - **The app rates each item**, from how the tutor set it up, including whether the instructions name the parts. The model never labels its own items.
+  - **Your rung moves both ways.** It goes up after clean answers at it (how many comes from how fast your past climbs went: 1 to 3), or one step for a clean pass on a harder item. It holds when you're right but unsure, had help, or guessed. It comes down after a sure miss or two misses in a row. Judging is earned only by passing a judge item.
+  - **The app holds the tutor to it:** an item two or more steps below your rung is refused, with how to pitch it instead, unless the tutor gives a reason (a warm-up once a lesson, right after a miss, or you asked for easier).
+  - **New skills get a head start** from the skills they build on (one step below), marked as an estimate until your first answer there. Profiles from before the ladder get rungs rebuilt from their saved answers, also as estimates.
+  - **Progress** shows it under each skill ("Now: planning whole matches yourself"), with the next step up on hover. It's saved with the profile, cleared by Reset progress, and kept in exports.
 - **Misconceptions are tied to topics.** A wrong pick on a move question records exactly which wrong idea it shows. A misconception clears by itself through the adaptive sign-off, and reopens if you slip again. Older ones get their topic from their wording.
 - **Adaptive sign-off** ([signoff.ts](../src/shared/signoff.ts)): when is a mistake really fixed?
   - **Evidence** comes only from lessons after the one it appeared in. Each such lesson counts once: 1 for a right graded answer, plus ¼ each if they were sure, gave the right reason, or did it in a new situation, at most 1.5. The tutor's own observations (`record_evidence`, which must say the `reason` and whether it was `transfer`) count half.
