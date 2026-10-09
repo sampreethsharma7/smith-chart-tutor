@@ -2,6 +2,7 @@ import { lessonsOf, type LessonFocus, type Profile } from '@shared/profile'
 import type { AppSettings } from '@shared/ipc'
 import { useTutor } from '@/agent/tutor'
 import { activeProvider, useApp, type View } from './app'
+import { confirmDialog } from '@/components/Confirm'
 
 /**
  * Everything in the app leads to one place: a lesson with the tutor.
@@ -60,7 +61,7 @@ export async function startLesson(focus?: LessonFocus) {
   if (t.busy) return
   if (t.history.length) {
     if (!focus) return // a lesson is already running: just go back to it
-    if (!window.confirm('End the current lesson (it will be summarised and saved) and start a new one?')) return
+    if (!(await confirmDialog('End the current lesson and start a new one?\n\nThe current one is summarised and saved.', { ok: 'Start new lesson' }))) return
     await t.endSession()
   }
   await useTutor.getState().startSession(focus)

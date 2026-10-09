@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { c, abs } from './complex'
-import { gammaFromZ, metricsFromZ, zFromGamma } from './metrics'
+import { gammaFromZ, metricsFromGamma, metricsFromZ, zFromGamma } from './metrics'
 import { computeTrace, inputImpedance, loadImpedance, nearestOnTrace, sweepFreqs, traceBands, NetworkElement } from './network'
 import { parseCstAscii, parseTouchstone, importFile } from './importers'
 
@@ -243,5 +243,18 @@ describe('adaptive model ranking', () => {
   })
   it('ignores attributes a report has no score for', () => {
     expect(fitScore({ overall: 0, speed: 0.8 }, ['speed', 'summary'])).toBeCloseTo(0.8)
+  })
+})
+
+describe('no rounding dust in the numbers', () => {
+  it('a real load reads as real (it showed 30 − j5.68e-14 Ω, Q 1.89e-15, a 4.1e-12 fF shunt equivalent)', () => {
+    const m = metricsFromGamma(gammaFromZ(c(30, 0), 50), 50, 2.45e9)
+    expect(m.Z.im).toBe(0)
+    expect(m.y.im).toBe(0)
+    expect(m.q).toBe(0)
+    expect(m.seriesEquivalent!.kind).toBe('none')
+    expect(m.shuntEquivalent!.kind).toBe('none')
+    // A small but real reactance stays.
+    expect(metricsFromZ(c(30, 0.01), 50).Z.im).toBeCloseTo(0.01, 9)
   })
 })

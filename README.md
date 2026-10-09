@@ -6,7 +6,7 @@
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-333%20passing-34d399">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-334%20passing-34d399">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a78bfa">
 </p>
 

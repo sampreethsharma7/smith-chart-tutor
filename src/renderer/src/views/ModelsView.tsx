@@ -5,6 +5,7 @@ import { api, useApp } from '@/state/app'
 import { useBench } from '@/state/bench'
 import { CompareModels } from './CompareModels'
 import { LocalTutorCard } from './LocalTutorCard'
+import { confirmDialog } from '@/components/Confirm'
 
 const pct = (x: number) => `${Math.round(x * 100)}%`
 const uidOf = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
@@ -100,7 +101,7 @@ function ConnectionCard({ c, startOpen }: { c: Connection; startOpen: boolean })
     await saveConfig({ connections: settings.connections.map((x) => (x.id === c.id ? { ...x, baseUrl: baseUrl.trim() || undefined } : x)) })
   }
   const removeConnection = async () => {
-    if (!window.confirm(`Remove ${c.label} and its ${models.length} model(s)? The key is deleted. Benchmark results are kept for comparison.`)) return
+    if (!(await confirmDialog(`Remove ${c.label} and its ${models.length} model(s)?\n\nThe key is deleted. Benchmark results are kept for comparison.`, { ok: 'Remove', danger: true }))) return
     await api().keys.set(c.id, null)
     await saveConfig({ connections: settings.connections.filter((x) => x.id !== c.id), providers: settings.providers.filter((p) => p.connectionId !== c.id) })
   }

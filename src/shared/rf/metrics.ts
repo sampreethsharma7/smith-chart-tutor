@@ -47,10 +47,17 @@ function equivalent(reactance: number, w: number): { kind: 'L' | 'C' | 'none'; v
   return reactance > 0 ? { kind: 'L', value: reactance / w } : { kind: 'C', value: -1 / (w * reactance) }
 }
 
+/** A part that is only rounding dust next to the other (below a billionth of the size) is zero. */
+function clean(c: Complex): Complex {
+  const m = Math.hypot(c.re, c.im)
+  if (!Number.isFinite(m) || m === 0) return c
+  return { re: Math.abs(c.re) < 1e-9 * m ? 0 : c.re, im: Math.abs(c.im) < 1e-9 * m ? 0 : c.im }
+}
+
 export function metricsFromGamma(g: Complex, z0: number, freqHz?: number): PointMetrics {
   const gammaMag = abs(g)
-  const Z = zFromGamma(g, z0)
-  const Y = inv(Z)
+  const Z = clean(zFromGamma(g, z0))
+  const Y = clean(inv(Z))
   const z = scale(Z, 1 / z0)
   const y = scale(Y, z0)
   const gammaDegVal = deg(arg(g))

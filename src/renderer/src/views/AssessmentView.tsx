@@ -6,6 +6,7 @@ import { useApp } from '@/state/app'
 import { modelReady, startLesson } from '@/state/journey'
 import { ChartBase } from '@/chart/ChartBase'
 import { sx, sy } from '@/chart/geometry'
+import { confirmDialog } from '@/components/Confirm'
 
 /**
  * Placement test. All progress lives in `profile.assessmentDraft` and is saved
@@ -63,7 +64,7 @@ export function AssessmentView() {
         <button className="link" onClick={() => setView('studio')} title="Your answers are saved; resume any time from here or the Get started bar">Pause</button>
         <button
           className="link danger"
-          onClick={() => window.confirm('Discard this placement test? Answers so far will be lost.') && updateProfile((p) => ({ ...p, assessmentDraft: undefined }))}
+          onClick={async () => (await confirmDialog('Discard this placement test?\n\nAnswers so far will be lost.', { ok: 'Discard', danger: true })) && updateProfile((p) => ({ ...p, assessmentDraft: undefined }))}
         >
           Discard
         </button>

@@ -3,6 +3,7 @@ import { createProfile, exportProfile, lessonsOf, migrateProfile, overallLevel, 
 import { api, useApp } from '@/state/app'
 import { flushConversation, useTutor } from '@/agent/tutor'
 import { useStudio } from '@/state/studio'
+import { confirmDialog } from '@/components/Confirm'
 
 type Draft = Pick<Profile, 'name' | 'background' | 'preferences'>
 
@@ -29,7 +30,7 @@ export function ProfilesView() {
   const doReset = async (p: Profile) => {
     const ask = `Reset ${p.name}'s progress?\n\nLessons, answers, skills, mistakes, the tutor's notes and the plan are cleared, and a lesson in progress ends. ` +
       `Name, background and preferences are kept.\n\nThis can't be undone: use Export first if you might want it back.`
-    if (!window.confirm(ask)) return
+    if (!(await confirmDialog(ask, { ok: 'Reset progress', danger: true }))) return
     await useApp.getState().updateProfileById(p.id, resetProgress)
     if (p.id === active?.id) {
       useStudio.getState().setExercise(null)
@@ -128,7 +129,7 @@ export function ProfilesView() {
                 <button
                   className="danger"
                   disabled={busy}
-                  onClick={() => window.confirm(`Delete profile "${p.name}" and all its history? This cannot be undone.`) && deleteProfile(p.id)}
+                  onClick={async () => (await confirmDialog(`Delete profile "${p.name}"?\n\nAll its history goes with it. This cannot be undone.`, { ok: 'Delete', danger: true })) && deleteProfile(p.id)}
                 >
                   Delete
                 </button>

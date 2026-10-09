@@ -7,6 +7,7 @@ import { partsText } from '@/agent/design/tools'
 import { describeLoad, useStudio, type StudioSnapshot } from './studio'
 import { useApp } from './app'
 import { modelReady } from './journey'
+import { confirmDialog } from '@/components/Confirm'
 
 /** The design on the chart, in a sentence for the tutor. */
 export function designSummary(s: StudioSnapshot): string {
@@ -29,7 +30,7 @@ export async function teachMeWhy() {
   }
   const snap = useStudio.getState().snapshot()
   const inLesson = useTutor.getState().history.length > 0
-  if (inLesson && !window.confirm('A lesson is in progress. Bring this design into it?\n\nThe lesson\'s chart is replaced by a copy of your design; the Design tab keeps its own.')) return
+  if (inLesson && !(await confirmDialog('A lesson is in progress. Bring this design into it?\n\nThe lesson\'s chart is replaced by a copy of your design; the Design tab keeps its own.', { ok: 'Bring it in' }))) return
   await app.setView('studio')
   if (useApp.getState().view !== 'studio') return
   useStudio.getState().loadSnapshot({ ...snap, annotations: [], exercise: null, prediction: null })

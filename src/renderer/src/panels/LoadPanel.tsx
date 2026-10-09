@@ -5,6 +5,7 @@ import { DEFAULT_SNAPSHOT, loadVariesWithFrequency, useStudio } from '@/state/st
 import { api, useApp } from '@/state/app'
 import { NumField } from '@/components/NumField'
 import { fmtHz } from '@/lib/format'
+import { confirmDialog } from '@/components/Confirm'
 
 const KINDS: Array<{ id: string; label: string; make(): LoadModel }> = [
   { id: 'fixed', label: 'Fixed impedance', make: () => ({ kind: 'fixed', R: 25, X: 30 }) },
@@ -39,8 +40,8 @@ export function LoadPanel() {
     }
   }
 
-  const resetChart = () => {
-    if (!window.confirm('Reset the chart to the default antenna, sweep and markers? Your matching network and imported data on this chart are cleared.')) return
+  const resetChart = async () => {
+    if (!(await confirmDialog('Reset the chart?\n\nIt goes back to the default antenna, sweep and markers. Your matching network and imported data on this chart are cleared.', { ok: 'Reset chart', danger: true }))) return
     const z0 = useApp.getState().profile?.preferences.defaultZ0 ?? 50
     st().loadSnapshot({ ...DEFAULT_SNAPSHOT, z0 })
     st().logEvent('reset', 'Reset the chart to the default setup')

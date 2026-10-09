@@ -674,3 +674,8 @@ button.big { padding: 8px 12px; font-size: 14px; }
 .flag-dialog { position: fixed; right: 16px; bottom: 16px; width: min(380px, calc(100vw - 32px)); z-index: 50; margin: 0; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
 .flag-dialog textarea { width: 100%; resize: vertical; }
 .flag-dialog .bad { color: var(--bad); }
+
+/* Yes/no questions in the app's own look */
+.confirm-backdrop { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--bg) 55%, transparent); display: grid; place-items: center; padding: 16px; }
+.confirm-dialog { width: min(440px, 100%); margin: 0; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); }
+.confirm-dialog p { margin: 0; color: var(--muted); }

@@ -13,6 +13,7 @@ import { SureButton, SureKey } from '@/components/SureButton'
 import { LessonLauncher } from '@/components/LessonLauncher'
 import { ELEMENT_LABEL } from '@shared/rf/network'
 import { countsAsLesson } from '@shared/profile'
+import { confirmDialog } from '@/components/Confirm'
 
 export function TutorPanel() {
   const items = useTutor((s) => s.items)
@@ -126,10 +127,10 @@ function FinishButton() {
   const plan = session?.plan
   const engaged = !!session && countsAsLesson(session)
   const done = !!plan && plan.step >= plan.steps.length
-  const finish = () => {
+  const finish = async () => {
     if (engaged && !done) {
       const where = plan ? ` (step ${plan.step + 1} of ${plan.steps.length})` : ''
-      if (!window.confirm(`Finish this lesson now? It's saved as partly done${where} and the tutor picks up from there next time.\n\nTo just take a break, leave it open: closing the app pauses the lesson.`)) return
+      if (!(await confirmDialog(`Finish this lesson now?\n\nIt's saved as partly done${where} and the tutor picks up from there next time. To just take a break, leave it open: closing the app pauses the lesson.`, { ok: 'Finish lesson' }))) return
     }
     useTutor.getState().endSession()
   }
