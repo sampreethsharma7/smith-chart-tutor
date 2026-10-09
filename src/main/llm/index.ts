@@ -27,28 +27,61 @@ export function retryDelayMs(message: string, attempt: number, local: boolean): 
   return null
 }
 
-export async function runChat(cfg: ProviderConfig, key: string, req: ChatRequest, requestId: string, emit: Emit) {
+/**
+ * How long a model may send nothing before the request counts as stalled. Cloud models that think
+ * before answering can be quiet for a while; a local model reading a long prompt on a CPU, longer.
+ */
+export const stallLimitMs = (local: boolean) => (local ? 300_000 : 90_000)
+
+export async function runChat(
+  cfg: ProviderConfig, key: string, req: ChatRequest, requestId: string, emit: Emit,
+  opts: { stallMs?: number } = {}
+) {
   const ctrl = new AbortController()
   active.set(requestId, ctrl)
   let streamed = false
-  const tracked: Emit = (ev) => {
-    if (ev.type === 'text' || ev.type === 'tool_call') streamed = true
-    emit(ev)
-  }
   const local = /localhost|127\.0\.0\.1/.test(cfg.baseUrl ?? '')
+  const stallMs = opts.stallMs ?? stallLimitMs(local)
+  let stalled = false
+  let stallRetried = false
   try {
     for (let attempt = 0; ; attempt++) {
+      // A stall watchdog per attempt: restarted by everything the model sends, it cancels a silent request.
+      const watch = new AbortController()
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const arm = () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => { stalled = true; watch.abort() }, stallMs)
+      }
+      const tracked: Emit = (ev) => {
+        if (ev.type === 'text' || ev.type === 'tool_call') streamed = true
+        arm()
+        emit(ev)
+      }
+      stalled = false
+      arm()
+      const signal = AbortSignal.any([ctrl.signal, watch.signal])
       try {
-        if (cfg.kind === 'anthropic') await anthropicChat(cfg, key, req, tracked, ctrl.signal)
-        else if (cfg.kind === 'gemini') await geminiChat(cfg, key, req, tracked, ctrl.signal)
-        else await openaiChat(cfg, key, req, tracked, ctrl.signal)
+        if (cfg.kind === 'anthropic') await anthropicChat(cfg, key, req, tracked, signal)
+        else if (cfg.kind === 'gemini') await geminiChat(cfg, key, req, tracked, signal)
+        else await openaiChat(cfg, key, req, tracked, signal)
+        if (stalled) throw new Error('stalled') // a provider that returns quietly on abort
         return
       } catch (e) {
+        if (ctrl.signal.aborted) throw e
+        if (stalled) {
+          // Silent from the start: ask once more. Part of a reply already shown: never send it twice.
+          if (streamed || stallRetried) throw new Error(stallMessage(cfg, stallMs))
+          stallRetried = true
+          continue
+        }
         const msg = e instanceof Error ? e.message : String(e)
-        const wait = streamed || ctrl.signal.aborted ? null : retryDelayMs(msg, attempt, local)
+        const wait = streamed ? null : retryDelayMs(msg, attempt, local)
         if (wait === null) throw e
         await new Promise((r) => setTimeout(r, wait))
         if (ctrl.signal.aborted) throw e
+      } finally {
+        clearTimeout(timer)
       }
     }
   } catch (e) {
@@ -57,6 +90,10 @@ export async function runChat(cfg: ProviderConfig, key: string, req: ChatRequest
   } finally {
     active.delete(requestId)
   }
+}
+
+function stallMessage(cfg: ProviderConfig, ms: number): string {
+  return `${cfg.label || cfg.model} stopped responding (nothing for ${Math.round(ms / 1000)} s). Nothing was lost: send your message again, or pick another model at the top.`
 }
 
 export function abortChat(requestId: string) {
