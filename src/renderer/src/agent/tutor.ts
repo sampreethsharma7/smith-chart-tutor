@@ -283,9 +283,11 @@ function basicNotes(s: SessionRecord): string {
   return `[Auto-notes] ${s.transcript.length} messages.${ex ? ` Exercises: ${ex}.` : ''}${asked ? ` Learner's last messages: ${asked}.` : ''}`
 }
 
-/** The tutor's drawings and zoom belong to the lesson they were made in. */
+/** The tutor's drawings and zoom belong to the lesson they were made in; a lesson starts with the traces and path visible. */
 function clearTutorMarks() {
   const st = useStudio.getState()
+  const o = st.overlays
+  if (!o.showLoadTrace || !o.showInputTrace || !o.showPath) st.setOverlays({ showLoadTrace: true, showInputTrace: true, showPath: true })
   if (st.annotations.length) st.setAnnotations(() => [])
   if (st.tutorView) st.restoreView()
 }

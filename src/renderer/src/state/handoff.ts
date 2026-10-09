@@ -33,7 +33,7 @@ export async function teachMeWhy() {
   if (inLesson && !(await confirmDialog('A lesson is in progress. Bring this design into it?\n\nThe lesson\'s chart is replaced by a copy of your design; the Design tab keeps its own.', { ok: 'Bring it in' }))) return
   await app.setView('studio')
   if (useApp.getState().view !== 'studio') return
-  useStudio.getState().loadSnapshot({ ...snap, annotations: [], exercise: null, prediction: null })
+  useStudio.getState().loadSnapshot({ ...snap, annotations: [], exercise: null, prediction: null, overlays: { ...snap.overlays, showLoadTrace: true, showInputTrace: true, showPath: true } })
   const design = designSummary(snap)
   if (inLesson) {
     await useTutor.getState().send(`I brought my design from the Design tab; it's on the chart now: ${design}. Help me understand why it works.`, { display: 'I brought my design from the Design tab. Help me understand why it works.' })

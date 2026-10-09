@@ -245,6 +245,10 @@ export const useStudio = create<StudioState>((set, get) => ({
     if ((kind === 'tline' || kind.endsWith('Stub')) && !el.zc) el.zc = get().z0
     set({ network: [...get().network, el] })
     get().logEvent(`add_${el.id}`, `Added ${ELEMENT_LABEL[kind]} ${elementValueText(el)} (position ${get().network.length} from load)`)
+    if (!get().overlays.showPath) {
+      set({ overlays: { ...get().overlays, showPath: true } })
+      get().logEvent('overlay_showPath', 'The matching path came on to show the new element')
+    }
     return el
   },
   updateElement(id, patch) {

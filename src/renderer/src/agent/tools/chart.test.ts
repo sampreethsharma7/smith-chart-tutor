@@ -166,3 +166,29 @@ describe('annotate_chart says only what it really drew', () => {
     expect(none.content).toMatch(/Nothing was drawn/)
   })
 })
+
+describe('nothing the lesson points at is silently hidden (flagged: "there is no trace here that I can see")', () => {
+  beforeEach(() => useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, showBand: false, overlays: { ...DEFAULT_SNAPSHOT.overlays, showLoadTrace: false, showInputTrace: false, showPath: false } }))
+
+  it('turning the band on brings its trace with it', async () => {
+    await runTool('set_scenario', { show_band: true, band_reason: 'see the sweep' }, ctx)
+    expect(useStudio.getState().overlays.showLoadTrace).toBe(true)
+  })
+
+  it('the tutor is told what the learner can not see, and can switch it on', async () => {
+    useStudio.getState().setShowBand(true, 'learner')
+    useStudio.getState().set('network', [{ id: 'a', kind: 'seriesL', value: 1e-9 }])
+    const state = JSON.parse((await runTool('get_chart_state', {}, ctx)).content)
+    expect(state.hidden_from_learner).toMatch(/the load trace.*the input trace.*the matching path/)
+    await runTool('set_scenario', { overlays: { load_trace: true, input_trace: true, matching_path: true } }, ctx)
+    const o = useStudio.getState().overlays
+    expect([o.showLoadTrace, o.showInputTrace, o.showPath]).toEqual([true, true, true])
+    expect(JSON.parse((await runTool('get_chart_state', {}, ctx)).content).hidden_from_learner).toBeUndefined()
+  })
+
+  it('adding an element shows the matching path (flagged: "added a Line, no curve")', () => {
+    useStudio.getState().addElement('tline', 45)
+    expect(useStudio.getState().overlays.showPath).toBe(true)
+    expect(useStudio.getState().events.at(-1)!.text).toMatch(/matching path came on/)
+  })
+})

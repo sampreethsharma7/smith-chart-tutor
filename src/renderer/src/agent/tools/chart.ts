@@ -76,6 +76,8 @@ export function applyScenario(ctx: ToolContext, a: Record<string, any>) {
   const band = typeof a.show_band === 'boolean' ? a.show_band : fresh ? loadVariesWithFrequency(ctx.studio.load) : undefined
   if (band !== undefined) {
     s.setShowBand(band, 'tutor', typeof a.band_reason === 'string' ? a.band_reason : undefined)
+    // A band without its trace shows nothing: turning the band on brings the trace with it.
+    if (band && !ctx.studio.overlays.showLoadTrace) s.setOverlays({ showLoadTrace: true })
     // A shown band must contain the design frequency, or the trace would sit off to one side.
     const { designFreq: f, sweep } = ctx.studio
     if (band && (f < sweep.start || f > sweep.stop)) s.set('sweep', sweepAround(f))
@@ -86,7 +88,10 @@ export function applyScenario(ctx: ToolContext, a: Record<string, any>) {
     s.setOverlays({
       ...(o.admittance !== undefined ? { admittance: !!o.admittance } : {}),
       ...(o.vswr_circle !== undefined ? { vswrCircle: o.vswr_circle || null } : {}),
-      ...(o.q_contour !== undefined ? { qContour: o.q_contour || null } : {})
+      ...(o.q_contour !== undefined ? { qContour: o.q_contour || null } : {}),
+      ...(o.load_trace !== undefined ? { showLoadTrace: !!o.load_trace } : {}),
+      ...(o.input_trace !== undefined ? { showInputTrace: !!o.input_trace } : {}),
+      ...(o.matching_path !== undefined ? { showPath: !!o.matching_path } : {})
     })
   }
 }
@@ -105,7 +110,12 @@ export const SCENARIO_PROPS = {
   clear_network: { type: 'boolean' },
   overlays: {
     type: 'object',
-    properties: { admittance: { type: 'boolean' }, vswr_circle: { type: 'number', description: 'VSWR value, 0 to hide' }, q_contour: { type: 'number', description: 'Q value, 0 to hide' } }
+    properties: {
+      admittance: { type: 'boolean' }, vswr_circle: { type: 'number', description: 'VSWR value, 0 to hide' }, q_contour: { type: 'number', description: 'Q value, 0 to hide' },
+      load_trace: { type: 'boolean', description: 'The load across the band (needs the band shown)' },
+      input_trace: { type: 'boolean', description: 'The input after the network across the band (needs the band shown)' },
+      matching_path: { type: 'boolean', description: 'The curve each element draws from the load to the input' }
+    }
   }
 }
 
@@ -154,6 +164,15 @@ const PT = {
   properties: { r: { type: 'number' }, x: { type: 'number' }, g: { type: 'number' }, b: { type: 'number' } }
 }
 
+/** Things on the chart the learner has switched off (or never had on) that a lesson may point at. */
+function hiddenFromLearner(s: ToolContext['studio']): string[] {
+  const out: string[] = []
+  if (s.showBand && !s.overlays.showLoadTrace) out.push('the load trace (the band is on, but its trace is hidden)')
+  if (s.showBand && s.network.length && !s.overlays.showInputTrace) out.push('the input trace')
+  if (s.network.length && !s.overlays.showPath) out.push('the matching path (the curves from the load to the input)')
+  return out
+}
+
 export default defineTools([
   {
     name: 'get_chart_state',
@@ -182,6 +201,7 @@ export default defineTools([
           frequency_band: `hidden: the learner sees ${fmtHz(s.designFreq)} only (no sweep, markers or bandwidth). Turn it on with set_scenario show_band only if the lesson needs frequency.`
         }),
         overlays: s.overlays,
+        ...(hiddenFromLearner(s).length ? { hidden_from_learner: `${hiddenFromLearner(s).join('; ')}. They can't see these: turn them on with set_scenario overlays (load_trace, input_trace, matching_path) before pointing at them.` } : {}),
         pinned_point: s.pinned ? fmtC(s.pinned) + ' (Γ)' : null,
         active_exercise: s.exercise ? { title: s.exercise.title, kind: s.exercise.kind ?? 'match', goal: exerciseGoal(s.exercise), status: s.exercise.status, attempts: s.exercise.attempts } : null,
         open_prediction: s.prediction ? { question: s.prediction.question, graded: s.prediction.key?.type ?? false, answered: s.prediction.answered ?? null } : null,

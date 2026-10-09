@@ -11,6 +11,11 @@ export function SweepPanel() {
   const band = useStudio((s) => s.showBand)
   const st = useStudio.getState
   const [mk, setMk] = useState('')
+  /** A trace or the path switched by the learner: the tutor hears about it, so it doesn't point at what they've hidden. */
+  const toggle = (key: 'showPath' | 'showLoadTrace' | 'showInputTrace', name: string, on: boolean) => {
+    st().setOverlays({ [key]: on })
+    st().logEvent(`overlay_${key}`, `Learner ${on ? 'showed' : 'hid'} the ${name}`)
+  }
 
   const addMarker = () => {
     const f = parseEng(mk)
@@ -59,9 +64,9 @@ export function SweepPanel() {
       <h3>Overlays</h3>
       <div className="fields">
         <label className="check"><input type="checkbox" checked={overlays.admittance} onChange={(e) => st().setOverlays({ admittance: e.target.checked })} /> Admittance grid</label>
-        <label className="check"><input type="checkbox" checked={overlays.showPath} onChange={(e) => st().setOverlays({ showPath: e.target.checked })} /> Matching path</label>
-        {band && <label className="check"><input type="checkbox" checked={overlays.showLoadTrace} onChange={(e) => st().setOverlays({ showLoadTrace: e.target.checked })} /> Load trace</label>}
-        {band && <label className="check"><input type="checkbox" checked={overlays.showInputTrace} onChange={(e) => st().setOverlays({ showInputTrace: e.target.checked })} /> Input trace</label>}
+        <label className="check"><input type="checkbox" checked={overlays.showPath} onChange={(e) => toggle('showPath', 'matching path', e.target.checked)} /> Matching path</label>
+        {band && <label className="check"><input type="checkbox" checked={overlays.showLoadTrace} onChange={(e) => toggle('showLoadTrace', 'load trace', e.target.checked)} /> Load trace</label>}
+        {band && <label className="check"><input type="checkbox" checked={overlays.showInputTrace} onChange={(e) => toggle('showInputTrace', 'input trace', e.target.checked)} /> Input trace</label>}
         <label className="check">
           <input type="checkbox" checked={overlays.vswrCircle !== null} onChange={(e) => st().setOverlays({ vswrCircle: e.target.checked ? 2 : null })} /> VSWR circle
           {overlays.vswrCircle !== null && <NumField value={overlays.vswrCircle} min={1.01} width={48} onCommit={(v) => st().setOverlays({ vswrCircle: v })} />}
