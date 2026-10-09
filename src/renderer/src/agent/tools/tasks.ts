@@ -2,7 +2,7 @@ import { c, isFiniteC, type Complex } from '@shared/rf/complex'
 import { gammaFromZ, metricsFromZ } from '@shared/rf/metrics'
 import { applyElement, ELEMENT_LABEL, inputImpedance, loadImpedance, type ElementKind, type NetworkElement } from '@shared/rf/network'
 import {
-  admittanceOf, DEFAULT_TASK_KINDS, describeTarget, expectedValue, findReach, fmtNorm, moveQuestion, parseTarget,
+  admittanceOf, DEFAULT_TASK_KINDS, describeTarget, expectedValue, findReach, fmtNorm, moveQuestion, parseTarget, pointNamedIn,
   QUANTITIES, regionOf, type Quantity
 } from '@shared/rf/tasks'
 import { MISTAKES, spotQuestion, type Mistake } from '@shared/rf/spot'
@@ -205,8 +205,24 @@ export default defineTools([
       const s = ctx.studio
       const f = s.designFreq
       let z = normPoint(a.point)
-      let what = z ? (typeof a.point?.g === 'number' ? `y = ${fmtNorm(admittanceOf(z))}` : `z = ${fmtNorm(z)}`) : ''
-      let graded = z ? (typeof a.point?.g === 'number' ? classifyLocate('y') : classifyLocate('z', onMajor(z))) : undefined
+      // Filed by what the card tells the learner, not by how the point was passed: "click z = 0.5 + j1"
+      // sent as {g, b} is still finding an impedance.
+      const named = z && !a.element ? pointNamedIn(String(a.question)) : null
+      const tol = Number.isFinite(a.tolerance) && a.tolerance > 0 ? Math.min(a.tolerance, 0.3) : 0.06
+      let cardNote = ''
+      if (z && named?.values.length) {
+        // The learner aims at what the card says: a value on the card within the click tolerance of the point
+        // (rounded on the card) is graded as the card says. None that close may be a start point the card names
+        // ("from z = 1 + j1, …"), so the given point stands, and the tutor is told to check the card.
+        const zs = named.values.map((v) => (named.via === 'z' ? v : admittanceOf(v))).filter(insideChart)
+        const dist = (w: Complex) => { const g1 = gammaFromZ(z!, 1), g2 = gammaFromZ(w, 1); return Math.hypot(g1.re - g2.re, g1.im - g2.im) }
+        const near = zs.sort((p, q) => dist(p) - dist(q))[0]
+        if (near && dist(near) <= tol) z = near
+        else cardNote = ` Check the card: it names ${named.via} = ${named.values.map(fmtNorm).join(' and ')}, but the spot graded is z = ${fmtNorm(z)} (y = ${fmtNorm(admittanceOf(z))}). If the card means that value as the spot to click, the grading is wrong: ask again with the point it names.`
+      }
+      const via = named?.via ?? (typeof a.point?.g === 'number' ? 'y' : 'z')
+      let what = z ? (via === 'y' ? `y = ${fmtNorm(admittanceOf(z))}` : `z = ${fmtNorm(z)}`) : ''
+      let graded = z ? (via === 'y' ? classifyLocate('y') : classifyLocate('z', onMajor(z))) : undefined
       if (!z && a.element) {
         const el = parseElement(a.element, f, s.z0)
         graded = classifyLocate(el.kind)
@@ -218,18 +234,17 @@ export default defineTools([
       if (!z) throw new Error('Give "point" ({r, x} or {g, b}) or "element" (with optional "from").')
       if (!insideChart(z)) throw new Error('That spot is off the chart (or at the open/short): pick another.')
       // Where a named part takes the point: a prediction about it (guided). A plain point is reading: no rung.
-      graded = inSituation(graded!, `${regionOf(z)}, ${a.element ? 'after an element' : typeof a.point?.g === 'number' ? 'given as y' : 'given as z'}`)
+      graded = inSituation(graded!, `${regionOf(z)}, ${a.element ? 'after an element' : via === 'y' ? 'given as y' : 'given as z'}`)
       if (a.element) graded = withRung(graded, 1)
       const fit = fitRung(ctx, graded, a.rung_reason)
       // A plain point is reading: the hover tip and readout would answer it, so they're covered (reading.ts).
       const read = a.element ? null : fitValues(ctx, graded, a.values, a.rung_reason)
-      const tol = Number.isFinite(a.tolerance) && a.tolerance > 0 ? Math.min(a.tolerance, 0.3) : 0.06
       const targetText = `${what} (y = ${fmtNorm(admittanceOf(z))})`
       s.setPrediction({
         id: uid('q'), question: String(a.question), kind: 'click', title: a.title ?? short(String(a.question)), skill: a.skill,
         key: { type: 'locate', target: gammaFromZ(z, 1), tol, targetText }, graded, ...(read ? { values: read.values } : {})
       })
-      return `Question card shown; the learner will click on the chart. The answer is ${targetText} (don't reveal it). The app grades the click and tells you how far off it is.${remember(ctx, graded!, 'locate', String(a.question))}${fit}${read?.note ?? ''}`
+      return `Question card shown; the learner will click on the chart. The answer is ${targetText} (don't reveal it). The app grades the click and tells you how far off it is.${remember(ctx, graded!, 'locate', String(a.question))}${fit}${read?.note ?? ''}${cardNote}`
     }
   },
   {

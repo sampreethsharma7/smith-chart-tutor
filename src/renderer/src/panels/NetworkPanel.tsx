@@ -70,7 +70,10 @@ export function NetworkPanel() {
                 <button className="icon" onClick={() => st().removeElement(el.id)} title="Remove">×</button>
               </div>
               <div className="row">
+                {/* Lines and stubs have two boxes; both are named, so a length can't be typed into Zc by mistake. */}
                 <NumField
+                  label={isLine(el.kind) ? 'length' : undefined}
+                  title={isLine(el.kind) ? 'Electrical length in degrees at the design frequency (360° = one wavelength)' : undefined}
                   value={el.value}
                   unit={isL(el.kind) ? 'H' : isC(el.kind) ? 'F' : isLine(el.kind) ? '°' : 'Ω'}
                   eng={!isLine(el.kind)}
@@ -79,7 +82,11 @@ export function NetworkPanel() {
                   onCommit={(value) => st().updateElement(el.id, { value })}
                 />
                 {isLine(el.kind) && (
-                  <NumField label="Zc" value={el.zc ?? 50} unit="Ω" min={0.1} width={52} onCommit={(zc) => st().updateElement(el.id, { zc })} />
+                  <NumField
+                    label="Zc"
+                    title={`The line's own characteristic impedance, not its length. Leave it at ${z0} Ω (the system Z0) unless the lesson uses a different line, e.g. a λ/4 transformer.`}
+                    value={el.zc ?? 50} unit="Ω" min={0.1} width={52} onCommit={(zc) => st().updateElement(el.id, { zc })}
+                  />
                 )}
               </div>
               <input

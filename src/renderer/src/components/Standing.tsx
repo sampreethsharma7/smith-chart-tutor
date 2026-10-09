@@ -90,8 +90,8 @@ export function Standing({ profile }: { profile: Profile }) {
         </div>
         {rows.map((r) => (
           <div key={r.id} className={`ladder-row ${r.status}`}>
-            <span className="ladder-name" title={r.status === 'locked' ? `Builds on ${r.needs.map(skillName).join(' and ')}` : undefined}>
-              {r.status === 'locked' && '🔒 '}{r.name}
+            <span className="ladder-name" title={r.status === 'locked' ? `Builds on ${r.needs.map(skillName).join(' and ')}: best after ${r.needs.length > 1 ? 'those are' : 'that is'} at 50%, but you can start it any time` : undefined}>
+              {r.name}
               <Independence profile={profile} skill={r.id} />
             </span>
             <Track r={r} />
@@ -133,7 +133,7 @@ const TOPIC_WORD: Record<TopicState, string> = { untried: 'not tried', shaky: 's
 
 function statusText(r: SkillStanding): string {
   switch (r.status) {
-    case 'locked': return `after ${r.needs.map((n) => skillName(n).split(' ')[0]).join(', ')}`
+    case 'locked': return `best after ${r.needs.map((n) => skillName(n).split(' ')[0]).join(', ')}`
     case 'unmeasured': return 'not measured'
     case 'top': return 'top ★'
     case 'provisional': return 'provisional: prove it'

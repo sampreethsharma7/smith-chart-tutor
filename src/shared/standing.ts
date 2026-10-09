@@ -231,7 +231,7 @@ export function standingForTutor(p: Profile, now: string): string {
   const o = overall(rows)
   const status = (r: SkillStanding) =>
     r.status === 'top' ? 'top' : r.status === 'strong' ? `strong, ${Math.round(r.toTop * 100)} to top`
-    : r.status === 'locked' ? `locked until ${r.needs.join(' and ')} reach 50%`
+    : r.status === 'locked' ? `best after ${r.needs.join(' and ')} (below 50%; a quick check of ${r.needs.length > 1 ? 'them' : 'it'} first, not a wall)`
     : r.status === 'unmeasured' ? 'not measured yet'
     : r.status === 'provisional' ? `provisional (the number says strong; still needs ${r.proof.missing})`
     : `${Math.round(r.toStrong * 100)} to strong`

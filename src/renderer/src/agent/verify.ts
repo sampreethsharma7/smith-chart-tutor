@@ -21,7 +21,7 @@ export const COORDINATES_NUDGE =
 export const VERIFY_NUDGE =
   '[System] Your last reply described how a point moves (direction, chart half or arc) without checking it this turn. ' +
   'Call what_if for that exact move now (start point and element), then write your reply again using its "move" facts: ' +
-  'the circle it follows, the rotation, the start and end chart half (as the learner sees them on the chart) and any real-axis crossing. ' +
+  'the circle it follows, the rotation, the start and end chart half (as the learner sees them on the chart), any real-axis crossing, and which way it goes on screen (up/down: the screen, never "down the g circle"). ' +
   'If anything you said earlier contradicts those facts, correct it plainly. Do not mention this check.'
 
 // ── Direction rules the app can check on its own ──────────────────────────────
@@ -113,7 +113,21 @@ const META = /\[system\]|\b(hidden from the learner|retry now|this response is h
  */
 const STRAY = (text: string) => /^\s/.test(text) && text.trim().length < 140 && /\b(you (must|can|should|need to)|retry|continue|proceed|respond)\b/i.test(text)
 
-export const isMetaReply = (text: string) => META.test(text) || STRAY(text)
+/**
+ * The app's own context echoed back as a reply (both seen in the Gemini novice test): the grading
+ * and memory report sent with an answer ("[Question answered] … App grading: … [Learner memory]
+ * Recorded automatically …"), or the session state with the list of tools ("default_api:…").
+ */
+// Exact forms the app writes, so ordinary teaching ("your answers are recorded automatically") never matches.
+const ECHO = /\[(question answered|question skipped|learner memory|their solution, each move verified|which way they missed, from the app)\b[^\]]*\]|\[(task|exercise) check #\d|\[prediction\] q:|\[follow-up\] they solved|\brecorded automatically \(don['’]t record_evidence|\bapp grading:|\bdefault_api\b|\bprevious message is repeated\b|\[tutor tools\b/i
+
+/** Two or more tool names: a list of the machinery, never teaching (one name alone is only logged). */
+const toolList = (text: string, toolNames: string[]) => toolNames.filter((n) => n.includes('_') && new RegExp(`\\b${n}\\b`).test(text)).length >= 2
+
+export const isMetaReply = (text: string, toolNames: string[] = []) => META.test(text) || STRAY(text) || ECHO.test(text) || toolList(text, toolNames)
+
+/** No words at all ("." from a real Gemini reply): nothing to show, so it counts as no reply. */
+export const isEmptyReply = (text: string) => !/[\p{L}\p{N}]/u.test(text)
 
 /**
  * A reply that is only a bracketed aside, e.g. "(I've just posted a quick question on the

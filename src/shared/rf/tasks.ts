@@ -245,6 +245,48 @@ export function parseComplex(text: string): Complex | null {
 }
 
 /**
+ * The point a question's own wording names, so it is filed and checked by what the learner reads:
+ * "click z = 0.5 + j1" → z with its value; "where is y = 1 − j1?" → y; "click this impedance" → z, no
+ * values (all it names: "from z = 1 + j1, click z = 1 − j1" names two). Normalised values only: one
+ * followed by Ω or ohm is skipped, as is "Δz" or "1/z". Null when it names neither, or both kinds.
+ */
+export function pointNamedIn(question: string): { via: 'z' | 'y'; values: Complex[] } | null {
+  const s = question.replace(/[−–—]/g, '-').replace(/\*\*|`|\$/g, '').replace(/(\d),(\d)/g, '$1.$2')
+  const found: Array<{ via: 'z' | 'y'; value: Complex }> = []
+  for (const m of s.matchAll(/(?<![\p{L}\p{N}_/Δ])([zy])\s*=\s*/gu)) {
+    const rest = s.slice(m.index! + m[0].length)
+    const value = leadingComplex(rest)
+    // Ohms or siemens ("z = 50 Ω", "y = 20 mS") aren't normalised values.
+    if (value && !/^\s*(Ω|ohm|m?S\b|siemens)/i.test(rest.slice(value.used))) found.push({ via: m[1] as 'z' | 'y', value: value.c })
+  }
+  const kinds = new Set(found.map((x) => x.via))
+  if (kinds.size === 1) return { via: found[0].via, values: found.map((x) => x.value) }
+  if (kinds.size > 1) return null
+  const imp = /\bimpedance\b/i.test(s), adm = /\badmittance\b/i.test(s)
+  return imp !== adm ? { via: imp ? 'z' : 'y', values: [] } : null
+}
+
+/**
+ * The complex number a text starts with ("0.5 + j1 on the chart" → 0.5 + j1, using 9 characters):
+ * the longest run of number-like words that parses, stopping where two numbers meet ("j1.0 2 times").
+ */
+function leadingComplex(text: string): { c: Complex; used: number } | null {
+  const run = /^[0-9.jJ+\- ]*/.exec(text)![0]
+  let best: { c: Complex; used: number } | null = null
+  let prevEndsDigit = false
+  for (const t of run.matchAll(/\S+/g)) {
+    if (prevEndsDigit && /^\d/.test(t[0])) break
+    prevEndsDigit = /\d$/.test(t[0])
+    const used = t.index! + t[0].length
+    // A "j" that starts a word isn't the imaginary unit ("z = 1 just above the axis").
+    if (/^\p{L}/u.test(text.slice(used))) break
+    const v = parseComplex(text.slice(0, used).replace(/\.$/, ''))
+    if (v) best = { c: v, used }
+  }
+  return best
+}
+
+/**
  * The "why" half of a two-part question: the right reason and wrong ones, each wrong
  * one tied to the wrong idea it shows (recorded as a misconception when picked).
  */

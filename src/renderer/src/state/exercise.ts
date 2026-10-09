@@ -1,8 +1,8 @@
-import { c } from '@shared/rf/complex'
+import { c, type Complex } from '@shared/rf/complex'
 import { metricsFromZ } from '@shared/rf/metrics'
-import { applyElement, ELEMENT_LABEL, inputImpedance, loadImpedance, sweepFreqs } from '@shared/rf/network'
+import { applyElement, ELEMENT_LABEL, inputImpedance, loadImpedance, sweepFreqs, type NetworkElement } from '@shared/rf/network'
 import { describeMove } from '@shared/rf/moves'
-import { describeTarget, measureFor, targetError } from '@shared/rf/tasks'
+import { describeTarget, measureFor, targetError, type Target } from '@shared/rf/tasks'
 import { fmtHz, fmtNum } from '@/lib/format'
 import { elementValueText, useStudio, type Exercise } from './studio'
 
@@ -12,6 +12,58 @@ export interface ExerciseGrade {
   worstVswrInBand?: { vswr: number; at: number }
   violations: string[]
   summary: string
+  /** For the tutor only (the learner sees the summary): which way a near miss was, from the app */
+  tutorNote?: string
+}
+
+/**
+ * For an L or C, whether a larger value takes the point further along its path (the part's effect
+ * grows from nothing): more L in series, more C in shunt; but a series C or a shunt L does more with
+ * LESS (its reactance or susceptance is 1/ωC, 1/ωL). Lines, stubs and resistors aren't covered:
+ * a line's path is periodic and a resistor's isn't an arc, so "further" has no single meaning there.
+ */
+const FURTHER_WITH_MORE: Partial<Record<NetworkElement['kind'], boolean>> = { seriesL: true, shuntC: true, seriesC: false, shuntL: false }
+
+/**
+ * Which way a reach task was missed, so the tutor doesn't have to guess ("went past" when it fell
+ * short). The last part's value is slid over ×1/50 … ×50 in fine steps (0.4% apart); of the values
+ * that land on the target, the one nearest the learner's own is the fix (a path can meet the target
+ * twice). Lumped L and C only (FURTHER_WITH_MORE); null otherwise, or when nothing is missed.
+ */
+export function reachMiss(Zbefore: Complex, last: NetworkElement, f: number, z0: number, target: Target): string | null {
+  const more = FURTHER_WITH_MORE[last.kind]
+  if (more === undefined || !(last.value > 0)) return null
+  const zOf = (v: number) => { const Z = applyElement(Zbefore, { ...last, value: v }, f); return c(Z.re / z0, Z.im / z0) }
+  if (targetError(zOf(last.value), target) <= target.tol) return null
+  const N = 2000, SPAN = Math.log(50)
+  const lkOf = (i: number) => -SPAN + (2 * SPAN * i) / N
+  let fixI = -1 // the landing value nearest theirs (index into the scan)
+  let best = { err: Infinity, i: -1 }
+  const errs: number[] = []
+  for (let i = 0; i <= N; i++) {
+    const err = targetError(zOf(last.value * Math.exp(lkOf(i))), target)
+    errs.push(err)
+    if (!Number.isFinite(err)) continue
+    if (err < best.err) best = { err, i }
+    if (err <= target.tol && (fixI < 0 || Math.abs(lkOf(i)) < Math.abs(lkOf(fixI)))) fixI = i
+  }
+  const name = `${ELEMENT_LABEL[last.kind]} ${elementValueText(last)}`
+  if (fixI < 0) {
+    // Still getting closer at the end of the range: the right part, but its size is far off (often a unit slip).
+    const falling = (best.i === N && errs[N] < errs[N - 50] - 1e-3) || (best.i === 0 && errs[0] < errs[50] - 1e-3)
+    if (falling) return `their last part (${name}) would need a far ${best.i === N ? 'LARGER' : 'SMALLER'} value (over 50× ${best.i === N ? 'more' : 'less'}) to land: the size is far off, so check the units (pH vs nH, fF vs pF). Use these words; don't give a value.`
+    return `their last part (${name}) can't land on the target by changing its value alone: the plan, not the size, is off. Use these words.`
+  }
+  // The middle of that landing band, not its near edge: how much to change it to land squarely.
+  const step = lkOf(fixI) > 0 ? 1 : -1
+  let mid = fixI
+  for (let i = fixI; i >= 0 && i <= N && errs[i] <= target.tol; i += step) if (errs[i] < errs[mid]) mid = i
+  const fix = lkOf(mid)
+  const larger = fix > 0
+  const short = larger === more
+  const way = short ? 'fell SHORT of the target along its path (it needs to travel further the same way)' : 'went PAST the target along its path (it needs to travel less far)'
+  const pct = Math.round(Math.abs(Math.exp(fix) - 1) * 100)
+  return `their last part (${name}) ${way}; that takes a ${larger ? 'LARGER' : 'SMALLER'} value (about ${pct}% ${larger ? 'more' : 'less'}). Use these words; don't give the value.`
 }
 
 /** What the card says the task is, e.g. "VSWR ≤ 1.2 at 2.4 GHz" or "input on the g = 1 circle (±0.05) at 2.4 GHz". */
@@ -44,7 +96,9 @@ export function gradeExercise(ex: Exercise): ExerciseGrade {
     const passed = onTarget && violations.length === 0
     const parts = [`point at ${fmtHz(ex.freqHz)}: ${measureFor(z, ex.target)}; target ${describeTarget(ex.target)} ±${fmtNum(ex.target.tol)}`]
     if (violations.length) parts.push(`constraint issues: ${violations.join('; ')}`)
-    return { passed, vswrAtF, violations, summary: `${passed ? 'PASS' : 'NOT YET'} — ${parts.join(', ')}` }
+    const last = s.network.at(-1)
+    const miss = !onTarget && last ? reachMiss(inputImpedance(loadImpedance(s.load, ex.freqHz, s.datasets), s.network.slice(0, -1), ex.freqHz), last, ex.freqHz, s.z0, ex.target) : null
+    return { passed, vswrAtF, violations, summary: `${passed ? 'PASS' : 'NOT YET'} — ${parts.join(', ')}`, ...(miss ? { tutorNote: miss } : {}) }
   }
 
   const maxVswr = ex.maxVswr ?? 1.5

@@ -81,7 +81,8 @@ async function checkOnce(ex: NonNullable<ReturnType<typeof useStudio.getState>['
   // Only a first pass is evidence (checks before it are work in progress). Right first time and on their
   // own is fully theirs; after several checks or talking it through with the tutor, partly.
   const report = firstPass ? await remember(ex.graded, 'correct', ex.title, { format: 'task', helped: !!ex.helped || next.attempts > 1 }) : ''
-  await useTutor.getState().send(`[${what} check #${next.attempts}] ${g.summary}. Network (load → source): ${net}.${solved}${report ? `\n[Learner memory] ${report}` : ''}`, {
+  const miss = g.tutorNote ? `\n[Which way they missed, from the app] ${g.tutorNote}` : ''
+  await useTutor.getState().send(`[${what} check #${next.attempts}] ${g.summary}. Network (load → source): ${net}.${miss}${solved}${report ? `\n[Learner memory] ${report}` : ''}`, {
     learnerAction: true,
     display: `✔ Checked (#${next.attempts}): ${g.summary}`,
     followUp: firstPass,

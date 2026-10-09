@@ -44,19 +44,21 @@ describe('set_next_focus: the tutor decides, everything else shows it', () => {
     expect(profile.nextFocus!.picks.map((x) => x.skill)).toEqual(['reflection'])
   })
 
-  it('holds the tutor to measured prerequisites, and says which one to pick instead', async () => {
-    // Unmeasured, the tutor may go where it judges best.
-    expect((await runTool('set_next_focus', { picks: [{ skill: 'l_match', why: 'x' }] }, ctx)).isError).toBe(false)
+  it('a weak measured prerequisite is advice, not a refusal (the novice test looped 27 times on it)', async () => {
+    // Unmeasured, no advice at all.
+    const free = await runTool('set_next_focus', { picks: [{ skill: 'l_match', why: 'x' }] }, ctx)
+    expect(free.isError).toBe(false)
+    expect(free.content).not.toMatch(/Advice/)
     profile = { ...profile, nextFocus: undefined }
     practise('lumped_moves', 3, false)
     const r = await runTool('set_next_focus', { picks: [{ skill: 'l_match', why: 'x' }] }, ctx)
-    expect(r.isError).toBe(true)
-    expect(r.content).toMatch(/l_match builds on lumped_moves, which is still below 50%. Pick lumped_moves first/)
-    expect(profile.nextFocus).toBeUndefined()
+    expect(r.isError).toBe(false)
+    expect(profile.nextFocus!.picks.map((x) => x.skill)).toEqual(['l_match'])
+    expect(r.content).toMatch(/Advice: l_match builds on lumped_moves \(lumped_moves \d+%, below 50%\): open that lesson with a quick check of lumped_moves/)
     practise('admittance', 6)
     practise('lumped_moves', 6)
     practise('reflection', 6)
-    expect((await runTool('set_next_focus', { picks: [{ skill: 'l_match', why: 'x' }] }, ctx)).isError).toBe(false)
+    expect((await runTool('set_next_focus', { picks: [{ skill: 'l_match', why: 'x' }] }, ctx)).content).not.toMatch(/Advice/)
   })
 
   it('refuses a topic from another skill, a missing reason, duplicates and nonsense', async () => {

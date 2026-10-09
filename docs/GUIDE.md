@@ -222,7 +222,7 @@ The targets come from how the app grades, not from other learners. The page has 
 
 - **Overall:** your level, an overall scale with both targets marked, and one square per skill that turns blue at strong and green at top.
 - **Work on next:** the tutor's plan (see below). Each card shows the tutor's reason, followed by the facts for that skill: the topic it chose, misconceptions, reviews due, and the gap to strong.
-- **Skills:** one bar per skill with the two target lines and a shaded "how sure" range that narrows with evidence. A skill whose prerequisites are measured and weak shows a lock. A self-reported starting guess locks nothing.
+- **Skills:** one bar per skill with the two target lines and a shaded "how sure" range that narrows with evidence. A skill whose prerequisites are measured and weak says "best after …": advice, not a lock, so you can still start it. A self-reported starting guess holds nothing back.
 - **Topics:** one square per topic, coloured by how it's going (not tried, shaky, building, strong, top), with ↻ when a review is due.
 
 **How the app judges what you know.** A high score has to be earned with proof, so the number can't run ahead of the understanding:
@@ -271,7 +271,7 @@ The targets come from how the app grades, not from other learners. The page has 
 - **The facts** come from [standing.ts](../src/shared/standing.ts) and `topicState` in [memory.ts](../src/shared/memory.ts): the targets, each skill's gap or lock, how each topic is going, and the "candidates by the numbers". The Progress page draws them, and the tutor reads the same facts in its instructions. If something is judged wrong, it's fixed there, once.
 - **The decision** is the tutor's `set_next_focus`: 1–3 skills (optionally a topic in each), each with a reason, saved on the profile. The Progress page ("Work on next"), the lesson launcher ("in your tutor's plan") and the tutor's own next lesson ("Tutor's pick") all read it.
 
-The tutor may disagree with the candidates when it has a reason. The app holds it to one rule: no skill whose measured prerequisites are weak. It sets the plan at the end of every lesson; `complete_lesson` asks for it once, without blocking a model that won't.
+The tutor may disagree with the candidates when it has a reason. A skill whose measured prerequisites are weak is accepted with advice (open that lesson with a quick check of the prerequisite), never refused: refusing it looped the plan back to the prerequisite 27 times in one test, often because that number was under-rated. It sets the plan at the end of every lesson; `complete_lesson` asks for it once, without blocking a model that won't.
 
 ### The tutor's memory of you
 

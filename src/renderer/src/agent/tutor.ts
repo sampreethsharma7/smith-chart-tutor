@@ -8,8 +8,8 @@ import { useStudio } from '@/state/studio'
 import { useCalc } from '@/state/calc'
 import { computeDerived } from '@/state/derived'
 import { buildSystemPrompt } from './prompt'
-import { COORDINATES_NUDGE, directionErrors, directionNudge, isMetaReply, isStageDirection, META_NUDGE, moveClaims, VERIFY_NUDGE } from './verify'
-import { migrateLessonState } from '@shared/lesson'
+import { COORDINATES_NUDGE, directionErrors, directionNudge, isEmptyReply, isMetaReply, isStageDirection, META_NUDGE, moveClaims, VERIFY_NUDGE } from './verify'
+import { inferFromStepText, migrateLessonState } from '@shared/lesson'
 import { endsTurn, runTool, toolActivity, toolSpecs, TOOLS } from './registry'
 import { TurnAudit } from './issueLog'
 import type { ToolContext } from './types'
@@ -161,6 +161,8 @@ const READ_ONLY = new Set(['get_chart_state', 'rf_calculate', 'what_if', 'solve_
 
 /** Tool specs for a provider (always sent when history may contain tool calls: some APIs require it). */
 const toolsFor = (supportsTools?: boolean) => (supportsTools === false ? undefined : toolSpecs())
+/** Every tool's name, to spot a list of them in a reply (any model can echo them, with tools or not). */
+const TOOL_NAMES = () => toolSpecs().map((t) => t.name)
 
 const FRESH = () => ({
   items: [] as DisplayItem[],
@@ -292,6 +294,8 @@ function clearTutorMarks() {
   if (!o.showLoadTrace || !o.showInputTrace || !o.showPath) st.setOverlays({ showLoadTrace: true, showInputTrace: true, showPath: true })
   if (st.annotations.length) st.setAnnotations(() => [])
   if (st.tutorView) st.restoreView()
+  // A click answer pins its spot; left over into the next lesson it sits where nothing is being asked (novice test, lessons 1 and 12).
+  if (st.pinned) st.setPinned(null)
 }
 
 export const useTutor = create<TutorState>((set, get) => {
@@ -478,15 +482,24 @@ export const useTutor = create<TutorState>((set, get) => {
         // The card already speaks; a bracketed aside ("(The question is on the screen!)") adds nothing.
         if (isStageDirection(textOf(message))) message = { role: 'assistant', parts: [] }
       }
+      // A reply with no words ("." from a real Gemini run) is no reply: the empty-reply nudge below asks again.
+      if (textOf(message).trim() && isEmptyReply(textOf(message))) {
+        audit.event('empty-reply', `returned only "${textOf(message).trim().slice(0, 10)}"`)
+        message = { ...message, parts: message.parts.filter((p) => p.type !== 'text') }
+      }
       const text = textOf(message)
       set({ usage: { input: get().usage.input + (res.usage.inputTokens ?? 0), output: get().usage.output + (res.usage.outputTokens ?? 0) } })
 
       // Every statement about how a point moves must rest on known coordinates and on what_if this turn.
       // Otherwise withdraw the reply (before any of its tool calls run) and have it established, verified and restated.
       const claims = moveClaims(text).length > 0
-      const coordsUnknown = get().session?.plan?.coordinates === 'unknown'
+      // Unknown coordinates: the reply itself may say plainly which it reads (strong evidence only, as for a
+      // step's wording). Saved only if the reply is shown (below), never from one that gets withdrawn.
+      const plan = get().session?.plan
+      const saidCoords = claims && plan?.coordinates === 'unknown' ? inferFromStepText(text) : 'unknown'
+      const coordsUnknown = plan?.coordinates === 'unknown' && saidCoords === 'unknown'
       // Text about the machinery ("This response is hidden from the learner. Retry now.") is never shown.
-      if (isMetaReply(text)) {
+      if (isMetaReply(text, TOOL_NAMES())) {
         audit.event('guard', 'reply about the machinery withdrawn')
         removeItem(itemId)
         if (metaFixes++ >= 2) return
@@ -525,13 +538,18 @@ export const useTutor = create<TutorState>((set, get) => {
 
       if (text.trim()) {
         spoke = true
+        if (saidCoords !== 'unknown' && plan) {
+          // In its own words, so as good as set_lesson_coordinates (not "inferred from an old lesson").
+          set({ session: { ...get().session!, plan: { ...plan, coordinates: saidCoords, coordinatesInferred: false } } })
+          audit.event('guard', `lesson coordinates taken from the reply: ${saidCoords}`)
+        }
         patchItem(itemId, (i) => ({ ...i, text, streaming: false }))
         logTranscript('tutor', text, provider.label)
         audit.said(text)
-        // The model wouldn't establish the coordinates: show the reply, but say plainly that it's unconfirmed.
-        if (claims && coordsUnknown) {
-          pushItem({ kind: 'system', text: "Careful: the tutor hasn't confirmed whether it means impedance (z) or admittance (y), so the directions above aren't checked. Ask it which one." })
-        }
+        // The model wouldn't establish the coordinates. Not a warning for the learner: z and y are read at the
+        // same point on this chart, so a move looks the same on screen either way, and the physics check above
+        // (directionErrors) doesn't depend on it. Logged for the issue report instead.
+        if (claims && coordsUnknown) audit.event('guard', 'move described with the lesson coordinates still unknown')
         // Still wrong after two rewrites: show it, but correct it plainly for the learner.
         if (wrongDirections.length) {
           const fix = wrongDirections.map((e) => e.fix).join('; ')

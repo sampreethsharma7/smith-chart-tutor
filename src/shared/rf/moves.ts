@@ -20,6 +20,8 @@ export interface MoveFacts {
   start: PointFacts
   end: PointFacts
   real_axis: string
+  /** Which way it goes on screen (up, down, left, right, toward the centre), as the learner sees it */
+  on_screen: string
   summary: string
 }
 
@@ -72,7 +74,7 @@ export function describeMove(Zstart: Complex, el: NetworkElement, f: number, z0:
     follows = `the constant b arc (conductance changes, susceptance doesn't)`
     centre = null
   } else if (isShunt(el.kind)) {
-    follows = `the constant g = ${r2(gS)} circle (red admittance circle, touches the short at the left edge)`
+    follows = `the constant g = ${r2(gS)} circle (an admittance circle, drawn dashed when the admittance grid is on; touches the short at the left edge)`
     centre = c(-gS / (1 + gS), 0)
   } else {
     follows = `the constant r = ${r2(z.re)} circle (touches the open at the right edge)`
@@ -113,6 +115,7 @@ export function describeMove(Zstart: Complex, el: NetworkElement, f: number, z0:
   const end = pointFacts(Zend, z0)
   const halves = start.chart_half === end.chart_half ? `stays in the ${start.chart_half} half` : `goes from the ${start.chart_half} half to the ${end.chart_half} half`
   const turn = rotation === 'none' ? '' : `, ${rotation} by ${Math.round(Math.abs(deg(turned)))}°`
+  const on_screen = screenMove(g[0], g[g.length - 1], { deg: Math.abs(deg(turned)), rotation })
   return {
     element: label,
     follows,
@@ -121,6 +124,26 @@ export function describeMove(Zstart: Complex, el: NetworkElement, f: number, z0:
     start,
     end,
     real_axis,
-    summary: `${label}: z ${start.z} → ${end.z} (y ${start.y} → ${end.y}); moves along ${follows}${turn}; ${halves} of the chart; ${real_axis}.`
+    on_screen,
+    summary: `${label}: z ${start.z} → ${end.z} (y ${start.y} → ${end.y}); moves along ${follows}${turn}; ${halves} of the chart; ${real_axis}; ${on_screen}.`
   }
+}
+
+/**
+ * Which way the point goes as the learner sees it (up is +j, whatever the coordinates), from start to
+ * end. Up/down here is the screen, never "down the g circle" in textbook terms: on this chart z and y
+ * sit at the same point, so a point below the axis moving to the centre goes up.
+ */
+export function screenMove(a: Complex, b: Complex, turn?: { deg: number; rotation: string }): string {
+  if (!isFiniteC(a) || !isFiniteC(b)) return 'on screen: to or from the edge of the chart'
+  // A long move (a line most of a wavelength): start to end says little; say it goes round.
+  if (turn && turn.rotation !== 'none' && turn.deg >= 360) return `on screen it goes all the way round${turn.deg >= 720 ? ` ${Math.floor(turn.deg / 360)} times` : ''}, ${turn.rotation}, then ${Math.round(turn.deg % 360)}° more`
+  if (turn && turn.rotation !== 'none' && turn.deg >= 300) return `on screen it goes almost all the way round, ${turn.rotation}, ending near where it started`
+  const dy = b.im - a.im, dx = b.re - a.re
+  const v = Math.abs(dy) > 0.02 ? (dy > 0 ? 'up' : 'down') : ''
+  const h = Math.abs(dx) > 0.02 ? (dx > 0 ? 'right' : 'left') : ''
+  const way = v && h ? `${v} and to the ${h}` : v || (h ? `to the ${h}` : 'barely')
+  const toCentre = abs(b) < abs(a) - 0.02 ? ', toward the centre' : abs(b) > abs(a) + 0.02 ? ', away from the centre' : ''
+  const round = turn && turn.rotation !== 'none' && turn.deg >= 180 ? `it goes more than halfway round, ${turn.rotation}; ` : ''
+  return `on screen ${round}it moves ${way}${toCentre} overall`
 }

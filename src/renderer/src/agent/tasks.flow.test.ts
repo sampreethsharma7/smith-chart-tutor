@@ -1101,3 +1101,161 @@ describe('reading questions: the values that would answer them are covered, and 
     expect(lastUserText(requests[0])).toMatch(/they typed the point instead of finding it on the chart/)
   })
 })
+
+describe('item 4: fixes from the 12-lesson novice test', () => {
+  const plan = (coordinates: 'unknown' | 'impedance' | 'admittance') =>
+    useTutor.setState({ session: { id: 'L1', startedAt: new Date().toISOString(), transcript: [], exercises: [], plan: { goal: 'Moves', steps: ['Practise moves'], step: 0, coordinates } } as any })
+  const systemLines = () => useTutor.getState().items.filter((i) => i.kind === 'system').map((i) => i.text)
+  const ONTO_R1 = { title: 'Onto r = 1', instructions: 'Use one part of your choice to land on the r = 1 circle.', target: { circle: { family: 'r', value: 1 } }, allowed_kinds: ['shuntL'] }
+
+  it('"click z = …" is filed as reading z, whichever way the point was passed (Gemini sent it as y)', async () => {
+    const y = { g: 0.4, b: -0.8 } // the admittance of z = 0.5 + j1
+    const r = await runTool('ask_locate', { question: 'Click z = 0.5 + j1 on the chart.', point: y }, ctx)
+    expect(r.isError).toBe(false)
+    expect(useStudio.getState().prediction?.graded).toMatchObject({ topic: 'plot_z', skill: 'chart_basics' })
+    expect(useStudio.getState().prediction?.graded?.ctx).toMatch(/given as z/)
+    // No value, just the word: still filed by what the card says.
+    await runTool('ask_locate', { question: 'Click this impedance on the chart.', point: y }, ctx)
+    expect(useStudio.getState().prediction?.graded?.topic).toBe('plot_z')
+    // And the other way round.
+    await runTool('ask_locate', { question: 'Click y = 1 − j1.', point: { r: 0.5, x: 0.5 } }, ctx)
+    expect(useStudio.getState().prediction?.graded).toMatchObject({ topic: 'plot_y', skill: 'admittance' })
+  })
+
+  it('a card whose value is not the point it grades: the tutor is told to check it (it may be a start point the card names)', async () => {
+    const r = await runTool('ask_locate', { question: 'Click z = 0.5 + j1 on the chart.', point: { r: 1, x: 1 } }, ctx)
+    expect(r.isError).toBe(false)
+    expect(r.content).toMatch(/Check the card: it names z = 0\.5 \+ j1, but the spot graded is z = 1 \+ j1/)
+    // A start point on the card is normal: shown, graded at the point given.
+    const from = await runTool('ask_locate', { question: 'From z = 1 + j1, add a series L of j0.5: click where it lands.', point: { r: 1, x: 1.5 } }, ctx)
+    expect(from.isError).toBe(false)
+    expect((useStudio.getState().prediction?.key as any).targetText).toMatch(/^z = 1 \+ j1\.5/)
+  })
+
+  it('re-review fixes: the "far off" note points at the size (units), and the change is to the middle of the landing band', async () => {
+    const { reachMiss } = await import('@/state/exercise')
+    const far = reachMiss(c(10, 0), { id: 'x', kind: 'seriesL', value: 1e-11 }, F, 50, parseTarget({ circle: { family: 'x', value: 1 } }))
+    expect(far).toMatch(/the size is far off, so check the units/)
+    // Half the right size: about 100% more (x = 1 from x = 0 takes L = Z0/ω exactly).
+    const L = 50 / (2 * Math.PI * F)
+    const half = reachMiss(c(10, 0), { id: 'x', kind: 'seriesL', value: L / 2 }, F, 50, parseTarget({ circle: { family: 'x', value: 1 } }))
+    expect(half).toMatch(/fell SHORT.*LARGER value \(about (9[89]|10[0-2])% more\)/)
+  })
+
+  it('no "Careful: z or y" line for the learner; a reply that says which it reads sets the coordinates', async () => {
+    plan('unknown')
+    script.push(call('what_if', { elements: [{ kind: 'seriesL', value: 2e-9 }] }), text('On the impedance chart, z = 0.5 + j0.5: a series L moves it clockwise along its constant r circle.'))
+    await useTutor.getState().send('Which way does a series L go?')
+    expect(useTutor.getState().session?.plan).toMatchObject({ coordinates: 'impedance', coordinatesInferred: false })
+    expect(requests).toHaveLength(2) // no nudge to establish them
+    expect(systemLines().join(' ')).not.toMatch(/Careful/)
+  })
+
+  it('a reply that never says which it reads is still shown without a warning, after the usual two nudges', async () => {
+    plan('unknown')
+    const vague = 'It moves clockwise and ends in the upper half.'
+    script.push(call('what_if', { elements: [{ kind: 'seriesL', value: 2e-9 }] }), text(vague), text(vague), text(vague))
+    await useTutor.getState().send('Where does it end up?')
+    expect(useTutor.getState().items.filter((i) => i.kind === 'tutor').at(-1)?.text).toBe(vague)
+    expect(systemLines().join(' ')).not.toMatch(/Careful|hasn't confirmed/)
+  })
+
+  it('the app\'s own context echoed back is never shown (Gemini lesson 3), and the tutor is asked to reply properly', async () => {
+    script.push(
+      text("[The user's previous message is repeated below for your context] [Question answered] Q: Which way? App grading: NOT QUITE [Learner memory] Recorded automatically: lumped_moves 0.30 → 0.25"),
+      text('Not quite: have another look at which circle it follows. Want to try another?')
+    )
+    await useTutor.getState().send('Was I right?')
+    const said = useTutor.getState().items.filter((i) => i.kind === 'tutor').map((i) => i.text)
+    expect(said).toEqual(['Not quite: have another look at which circle it follows. Want to try another?'])
+    expect(lastUserText(requests[1])).toMatch(/not addressed to the learner/)
+  })
+
+  it('a list of tools is withheld (Gemini lesson 4); one tool name alone is only logged', async () => {
+    const { isMetaReply } = await import('./verify')
+    const names = ['show_calculation', 'set_next_focus', 'what_if']
+    expect(isMetaReply('; design freq: 2.4 GHz - default_api:show_calculation - default_api:set_next_focus', names)).toBe(true)
+    expect(isMetaReply('Tools: show_calculation, set_next_focus.', names)).toBe(true)
+    expect(isMetaReply('I used what_if to check it: clockwise.', names)).toBe(false)
+    expect(isMetaReply('Nice work on the prediction: it moves clockwise. [Try a bigger value next.]', names)).toBe(false)
+  })
+
+  it('a reply of just "." counts as no reply: the tutor is asked again (Gemini lesson 7)', async () => {
+    script.push(text('.'), text('Good question: bandwidth is how wide a band stays matched.'))
+    await useTutor.getState().send('How does this affect bandwidth for my project?')
+    expect(useTutor.getState().items.filter((i) => i.kind === 'tutor').map((i) => i.text)).toEqual(['Good question: bandwidth is how wide a band stays matched.'])
+    expect(lastUserText(requests[1])).toMatch(/Please reply to the learner/)
+  })
+
+  it('a missed reach task tells the tutor which way it was missed, and whether that takes a larger or smaller value (Sonnet lesson 8)', async () => {
+    const { gradeExercise } = await import('@/state/exercise')
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: -50 }, designFreq: F }) // y = 0.4 + j0.2
+    expect((await runTool('create_target_task', ONTO_R1, ctx)).isError).toBe(false)
+    useStudio.getState().addElement('shuntL', 6.5e-9)
+    const short = gradeExercise(useStudio.getState().exercise!)
+    expect(short.passed).toBe(false)
+    expect(short.tutorNote).toMatch(/fell SHORT of the target along its path.*SMALLER value/)
+    expect(short.summary).not.toMatch(/SHORT|SMALLER/) // the learner's line stays "not yet"
+    useStudio.getState().updateElement(useStudio.getState().network[0].id, { value: 3e-9 })
+    expect(gradeExercise(useStudio.getState().exercise!).tutorNote).toMatch(/went PAST .*LARGER value/)
+  })
+
+  it('a reach task the last part cannot make by size alone says so', async () => {
+    const { reachMiss } = await import('@/state/exercise')
+    // From z = 2 − j1 a series L stays on r = 2: no value reaches r = 1.
+    const note = reachMiss(c(100, -50), { id: 'x', kind: 'seriesL', value: 2e-9 }, F, 50, parseTarget({ circle: { family: 'r', value: 1 } }))
+    expect(note).toMatch(/can't land on the target by changing its value alone/)
+  })
+
+  it('the tutor hears which way they missed when they press Check; the learner sees only "not yet"', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: -50 }, designFreq: F })
+    await runTool('create_target_task', ONTO_R1, ctx)
+    useStudio.getState().addElement('shuntL', 6.5e-9)
+    script.push(text('Close!'))
+    await checkExerciseAsync()
+    await idle()
+    expect(lastUserText(requests[0])).toMatch(/\[Which way they missed, from the app\] their last part \(Shunt L [^)]*\) fell SHORT/)
+    expect(useTutor.getState().items.filter((i) => i.kind !== 'tutor').map((i) => i.text).join(' ')).not.toMatch(/SHORT|SMALLER/)
+  })
+
+  it('review fixes: the miss note covers L and C only, picks the landing nearest their value, and says when the size is far off', async () => {
+    const { reachMiss } = await import('@/state/exercise')
+    const r1 = parseTarget({ circle: { family: 'r', value: 1 } })
+    // No note where "further" has no single meaning: resistors, lines, stubs.
+    expect(reachMiss(c(100, -50), { id: 'r', kind: 'seriesR', value: 20 }, F, 50, parseTarget({ circle: { family: 'r', value: 3 } }))).toBeNull()
+    expect(reachMiss(c(100, -50), { id: 'l', kind: 'tline', value: 160, zc: 100 }, F, 50, r1)).toBeNull()
+    expect(reachMiss(c(100, -50), { id: 's', kind: 'openStub', value: 40 }, F, 50, r1)).toBeNull()
+    // Far too small a value: says so instead of "the plan is off". From z = 0.2 (10 Ω) a series L reaches
+    // x = 1 only with ~3.3 nH; 0.01 nH is over 50× short.
+    const far = reachMiss(c(10, 0), { id: 'x', kind: 'seriesL', value: 1e-11 }, F, 50, parseTarget({ circle: { family: 'x', value: 1 } }))
+    expect(far).toMatch(/would need a far LARGER value \(over 50× more\)/)
+    // A series C does more with LESS: short of the target means a smaller C.
+    const sc = reachMiss(c(10, 0), { id: 'x', kind: 'seriesC', value: 3e-12 }, F, 50, parseTarget({ circle: { family: 'x', value: -2 } }))
+    expect(sc).toMatch(/fell SHORT.*SMALLER value/)
+  })
+
+  it('review fixes: a card naming two points is fine if one is the graded one; a rounded value is graded as the card says', async () => {
+    expect((await runTool('ask_locate', { question: 'Starting from z = 1 + j1, click where z = 1 − j1 is.', point: { r: 1, x: -1 } }, ctx)).isError).toBe(false)
+    // The card rounds y to one decimal; the point passed is the exact one. Graded at the card's value.
+    await runTool('ask_locate', { question: 'Click y = 0.4 − j0.2.', point: { g: 0.41, b: -0.21 } }, ctx)
+    const key = useStudio.getState().prediction?.key as any
+    expect(key.targetText).toMatch(/^y = 0\.4 − j0\.2/)
+  })
+
+  it('review fixes: ordinary words about recording are not withheld; coordinates aren\'t saved from a withdrawn reply', async () => {
+    const { isMetaReply } = await import('./verify')
+    expect(isMetaReply('Your answers are recorded automatically, so just keep going. Next: a follow-up on the same idea.')).toBe(false)
+    plan('unknown')
+    // An admittance-worded reply with a wrong direction: withdrawn, so the lesson coordinates stay unknown.
+    const wrong = 'On the admittance chart, y = 1 + j1: a shunt C moves it counter-clockwise along its constant g circle.'
+    script.push(call('what_if', { elements: [{ kind: 'shuntC', value: 1e-12 }] }), text(wrong), text('Let me look again at that on the chart. Want to predict it first?'))
+    await useTutor.getState().send('Which way does a shunt C go?')
+    expect(useTutor.getState().session?.plan?.coordinates).toBe('unknown')
+  })
+
+  it('the point pinned by a click answer is cleared when a lesson ends', () => {
+    useStudio.getState().setPinned({ re: 0.2, im: -0.3 })
+    useTutor.getState().reset()
+    expect(useStudio.getState().pinned).toBeNull()
+  })
+})

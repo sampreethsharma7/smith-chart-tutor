@@ -61,12 +61,15 @@ export default defineTools([
       if (!raw.length) throw new Error('Give 1–3 picks: [{ skill, topic?, why }].')
       const p = ctx.profile()
       const rows = skillStanding(p, new Date().toISOString())
+      const advice: string[] = []
       const picks = raw.slice(0, 3).map((x) => {
         const skill = checkSkill(String(x.skill))
         const row = rows.find((r) => r.id === skill)!
-        // The one rule the app holds the tutor to: a skill waits for its prerequisites.
+        // A weak prerequisite is advice, not a wall: the number may be under-rated (one miss, an answer
+        // filed under the wrong skill), and refusing the plan only loops it back to the prerequisite.
         if (row.status === 'locked') {
-          throw new Error(`${skill} builds on ${row.needs.join(' and ')}, which ${row.needs.length > 1 ? 'are' : 'is'} still below 50%. Pick ${row.needs.join(' or ')} first; ${skill} opens up after that.`)
+          const pct = row.needs.map((n) => `${n} ${Math.round(p.skills[n].mastery * 100)}%`).join(', ')
+          advice.push(`${skill} builds on ${row.needs.join(' and ')} (${pct}, below 50%): open that lesson with a quick check of ${row.needs.join(' and ')}; if they get it, carry on with ${skill}, if not, teach that first`)
         }
         let topic: TopicId | undefined
         if (x.topic) {
@@ -80,7 +83,7 @@ export default defineTools([
       if (new Set(picks.map((x) => x.skill)).size !== picks.length) throw new Error('Each skill once; put the topic in "topic".')
       const s = ctx.session()
       await ctx.updateProfile((pr) => ({ ...pr, nextFocus: { picks, at: new Date().toISOString(), model: s?.models?.at(-1), session: s?.id } }))
-      return `Plan saved: ${picks.map((x, i) => `${i + 1}. ${skillName(x.skill)}${x.topic ? ` (${x.topic})` : ''}`).join(', ')}. The learner sees it on Progress and when starting a lesson.`
+      return `Plan saved: ${picks.map((x, i) => `${i + 1}. ${skillName(x.skill)}${x.topic ? ` (${x.topic})` : ''}`).join(', ')}. The learner sees it on Progress and when starting a lesson.${advice.length ? ` Advice: ${advice.join('; ')}.` : ''}`
     }
   },
   {

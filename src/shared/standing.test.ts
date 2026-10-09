@@ -104,7 +104,7 @@ describe('where you stand', () => {
     expect(text).toMatch(/strong 75% = gets medium-difficulty tasks right every time; top 95%/)
     expect(text).toMatch(/1\/9 skills at strong, 1 at top/)
     expect(text).toMatch(/chart_basics top; reflection not measured yet/)
-    expect(text).toMatch(/l_match locked until lumped_moves reach 50%/)
+    expect(text).toMatch(/l_match best after lumped_moves \(below 50%; a quick check of it first, not a wall\)/)
     expect(text).toMatch(/tlines provisional \(the number says strong; still needs 3 more right answers/)
     expect(text).toMatch(/Candidates by the numbers \(evidence for your pick, not the pick\)/)
   })
