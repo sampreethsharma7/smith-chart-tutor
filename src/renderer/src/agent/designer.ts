@@ -263,6 +263,8 @@ export const useDesigner = create<DesignerState>((set, get) => {
     clear() {
       if (get().busy) return
       lastSeenEventAt = Date.now()
+      // The assistant's drawings belonged to that conversation (only while the Design chart is open).
+      if (currentChartMode() === 'design' && useStudio.getState().annotations.length) useStudio.getState().setAnnotations(() => [])
       set(FRESH())
     }
   }

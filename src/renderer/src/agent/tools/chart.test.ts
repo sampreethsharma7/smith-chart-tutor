@@ -147,3 +147,22 @@ describe('one frequency unless the lesson needs a band', () => {
     expect(useStudio.getState().showBand).toBe(true)
   })
 })
+
+describe('annotate_chart says only what it really drew', () => {
+  beforeEach(() => useStudio.getState().loadSnapshot(DEFAULT_SNAPSHOT))
+
+  it('a VSWR circle given only a point is drawn through that point (a real Gemini call drew nothing and said it had)', async () => {
+    const r = await runTool('annotate_chart', { shapes: [{ kind: 'vswrCircle', color: '#3b82f6', at: { r: 0.6, x: 0 } }] }, ctx)
+    expect(r.isError).toBe(false)
+    expect(r.content).toMatch(/VSWR 1\.67 circle \(through the point given\)/)
+    expect(useStudio.getState().annotations[0].value).toBeCloseTo(1 / 0.6, 6)
+  })
+
+  it('a shape that cannot be drawn is reported, and nothing drawable means an error, not "Drew 1 shape"', async () => {
+    const some = await runTool('annotate_chart', { shapes: [{ kind: 'rCircle', value: 1 }, { kind: 'vswrCircle' }, { kind: 'point' }] }, ctx)
+    expect(some.content).toMatch(/^Drew a constant-r circle r = 1\. NOT drawn/)
+    const none = await runTool('annotate_chart', { shapes: [{ kind: 'vswrCircle' }] }, ctx)
+    expect(none.isError).toBe(true)
+    expect(none.content).toMatch(/Nothing was drawn/)
+  })
+})

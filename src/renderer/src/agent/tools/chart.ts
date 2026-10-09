@@ -3,6 +3,7 @@ import { gammaFromZ, type PointMetrics } from '@shared/rf/metrics'
 import { ELEMENT_LABEL, type ElementKind, type LoadModel } from '@shared/rf/network'
 import { describeLoad, describeView, elementValueText, loadVariesWithFrequency, uid, useStudio, type Annotation } from '@/state/studio'
 import { FULL_VIEW, frameView, inView } from '@/chart/ChartBase'
+import { valueThrough } from '@/chart/geometry'
 import { fmtC, fmtHz } from '@/lib/format'
 import { exerciseGoal } from '@/state/exercise'
 import { defineTools, type ToolContext } from '../types'
@@ -119,6 +120,34 @@ function pointOf(p: any): Complex | undefined {
   return undefined
 }
 
+const fmtV = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : Number(v.toPrecision(3)).toString())
+
+/**
+ * Whether a shape can be drawn, with its value: a circle given only a point "at" takes the value
+ * through that point (the VSWR circle through z = 0.6 is VSWR 1.67). The reason when it can't.
+ */
+export function checkShape(sh: any): { value?: number; what: string } | string {
+  const kind = sh?.kind
+  const g = pointOf(sh?.at)
+  const name = String(kind)
+  if (kind === 'point') return g ? { what: `a point${sh.label ? ` "${sh.label}"` : ''}` } : 'a point without "at" ({r, x} or {g, b})'
+  if (kind === 'arrow') return g && pointOf(sh.to) ? { what: `an arrow${sh.label ? ` "${sh.label}"` : ''}` } : 'an arrow needs both "at" and "to"'
+  const LIMITS: Record<string, [string, (v: number) => boolean]> = {
+    vswrCircle: ['VSWR circle', (v) => v > 1], rCircle: ['constant-r circle r =', (v) => v >= 0], xArc: ['constant-x arc x =', (v) => v !== 0],
+    gCircle: ['constant-g circle g =', (v) => v >= 0], bArc: ['constant-b arc b =', (v) => v !== 0], qContour: ['Q contour Q =', (v) => v > 0]
+  }
+  if (!LIMITS[name]) return `unknown shape kind "${name}"`
+  let v: number | undefined = typeof sh.value === 'number' && Number.isFinite(sh.value) ? sh.value : undefined
+  let through = ''
+  if (v === undefined && g) {
+    v = valueThrough(name, g)
+    through = ` (through the point given)`
+  }
+  const [label, ok] = LIMITS[name]
+  if (v === undefined || !Number.isFinite(v) || !ok(v)) return `${label.replace(/ [a-zA-Z]+ =$/, '')}: give "value"${v !== undefined ? ` (got ${v})` : ''}, or a point "at" it passes through`
+  return { value: v, what: name === 'vswrCircle' ? `a VSWR ${fmtV(v)} circle${through}` : `a ${label} ${fmtV(v)}${through}` }
+}
+
 const PT = {
   type: 'object',
   description: 'Normalized point: {r, x} for impedance z = r + jx, or {g, b} for admittance y = g + jb',
@@ -231,7 +260,7 @@ export default defineTools([
               kind: { type: 'string', enum: ['point', 'arrow', 'rCircle', 'xArc', 'gCircle', 'bArc', 'vswrCircle', 'qContour'] },
               at: PT,
               to: PT,
-              value: { type: 'number', description: 'r, x, g, b, VSWR or Q value for circle kinds' },
+              value: { type: 'number', description: 'r, x, g, b, VSWR or Q value for circle kinds (or give "at": the circle through that point)' },
               label: { type: 'string' },
               color: { type: 'string', description: 'CSS color (optional)' }
             },
@@ -244,11 +273,21 @@ export default defineTools([
     },
     activity: () => 'Drawing on the chart',
     run(a, ctx) {
-      const shapes: Annotation[] = (a.shapes ?? []).map((sh: any) => ({
-        id: uid('ann'), kind: sh.kind, gamma: pointOf(sh.at), to: pointOf(sh.to), value: sh.value, label: sh.label, color: sh.color
-      }))
-      ctx.studio.setAnnotations((prev) => (a.replace === false ? [...prev, ...shapes] : shapes))
-      return `Drew ${shapes.length} shape(s).`
+      // Check every shape can really be drawn, and say exactly what was: never "drew it" for something invisible.
+      const drawn: Annotation[] = []
+      const said: string[] = []
+      const skipped: string[] = []
+      for (const sh of (Array.isArray(a.shapes) ? a.shapes : []) as any[]) {
+        const r = checkShape(sh)
+        if (typeof r === 'string') skipped.push(r)
+        else {
+          drawn.push({ id: uid('ann'), kind: sh.kind, gamma: pointOf(sh.at), to: pointOf(sh.to), value: r.value, label: sh.label, color: sh.color })
+          said.push(r.what)
+        }
+      }
+      if (!drawn.length) throw new Error(`Nothing was drawn: ${skipped.join('; ') || 'no shapes given'}. Fix the shapes and call again before you mention a drawing.`)
+      ctx.studio.setAnnotations((prev) => (a.replace === false ? [...prev, ...drawn] : drawn))
+      return `Drew ${said.join('; ')}.${skipped.length ? ` NOT drawn (don't mention these): ${skipped.join('; ')}.` : ''}`
     }
   },
   {

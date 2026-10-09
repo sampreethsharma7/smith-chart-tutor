@@ -16,6 +16,16 @@ export const gCircle = (g: number): Circle => ({ cx: -g / (1 + g), cy: 0, r: 1 /
 export const bCircle = (b: number): Circle => ({ cx: -1, cy: 1 / b, r: 1 / Math.abs(b) })
 export const vswrCircle = (s: number): Circle => ({ cx: 0, cy: 0, r: (s - 1) / (s + 1) })
 /** The two arcs of a constant-|Q| contour (upper = inductive, lower = capacitive). */
+/** The value of a circle family through a point Γ: the VSWR, r, x, g, b or Q circle that passes there. */
+export function valueThrough(kind: string, g: Complex): number | undefined {
+  const den = (1 - g.re) ** 2 + g.im ** 2
+  const z = { re: (1 - g.re * g.re - g.im * g.im) / den, im: (2 * g.im) / den }
+  const d = z.re * z.re + z.im * z.im
+  const m = Math.hypot(g.re, g.im)
+  const v = { vswrCircle: (1 + m) / (1 - m), rCircle: z.re, xArc: z.im, gCircle: z.re / d, bArc: -z.im / d, qContour: Math.abs(z.im) / z.re }[kind]
+  return v !== undefined && Number.isFinite(v) ? v : undefined
+}
+
 export const qCircles = (q: number): [Circle, Circle] => {
   const r = Math.sqrt(1 + 1 / (q * q))
   return [{ cx: 0, cy: 1 / q, r }, { cx: 0, cy: -1 / q, r }]

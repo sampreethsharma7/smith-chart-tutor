@@ -4,10 +4,17 @@ import { Tex } from './Tex'
 
 export { plainMath } from './mathText'
 
+/**
+ * A model sometimes writes line breaks as the two characters "\n". Turn those into breaks, but
+ * not LaTeX commands that start with \n (\nu, \nabla, \neq): only before a capital, a digit,
+ * a space, another break or the end.
+ */
+export const unescapeBreaks = (t: string) => t.replace(/\\n(?=\\n|[A-Z0-9\s]|$)/g, '\n')
+
 /** Tiny, safe markdown subset: paragraphs, bullet/numbered lists, **bold**, *italic*, `code`, ### headings, and formulas ($…$, $$…$$). */
 export function Markdown({ text }: { text: string }) {
   const blocks: ReactNode[] = []
-  const lines = text.replace(/\r/g, '').replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]/g, (m) => m.replace(/\n/g, ' ')).split('\n')
+  const lines = unescapeBreaks(text).replace(/\r/g, '').replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]/g, (m) => m.replace(/\n/g, ' ')).split('\n')
   let list: { ordered: boolean; items: string[] } | null = null
   let para: string[] = []
 

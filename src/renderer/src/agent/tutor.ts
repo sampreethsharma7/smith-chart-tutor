@@ -282,6 +282,13 @@ function basicNotes(s: SessionRecord): string {
   return `[Auto-notes] ${s.transcript.length} messages.${ex ? ` Exercises: ${ex}.` : ''}${asked ? ` Learner's last messages: ${asked}.` : ''}`
 }
 
+/** The tutor's drawings and zoom belong to the lesson they were made in. */
+function clearTutorMarks() {
+  const st = useStudio.getState()
+  if (st.annotations.length) st.setAnnotations(() => [])
+  if (st.tutorView) st.restoreView()
+}
+
 export const useTutor = create<TutorState>((set, get) => {
   const pushItem = (it: Omit<DisplayItem, 'id'>) => {
     const item = { ...it, id: iid() }
@@ -660,6 +667,8 @@ export const useTutor = create<TutorState>((set, get) => {
       const p = useApp.getState().profile
       const n = (p ? lessonsOf(p).length : 0) + 1
       set({ sessionStartedAt: Date.now(), lastEnded: null, notice: null })
+      // A new lesson starts on a clean chart: the last lesson's drawings would label the wrong things.
+      clearTutorMarks()
       const s = ensureSession()
       set({ session: { ...s, focus } })
       summarizeStaleSessions().catch(console.error)
@@ -721,6 +730,7 @@ export const useTutor = create<TutorState>((set, get) => {
 
     reset() {
       useStudio.getState().setPrediction(null)
+      clearTutorMarks()
       // The tutor's worked example belonged to that lesson.
       if (useCalc.getState().tutorNote) useCalc.getState().set({}, 'learner')
       set(FRESH())

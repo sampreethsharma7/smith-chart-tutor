@@ -8,7 +8,7 @@ import { useDerived } from '@/state/derived'
 import { useCalc } from '@/state/calc'
 import { fmtC, fmtHz, fmtNum, fmtDb } from '@/lib/format'
 import { ChartBase, clampView, FULL_VIEW, frameView, useChartScale, VIEW, type ChartView } from './ChartBase'
-import { arrowAlong, bCircle, gCircle, polylines, type Pt, qCircles, R_MAJOR, R_MINOR, rCircle, sx, sy, vswrCircle, X_MAJOR, X_MINOR, xCircle, type Circle } from './geometry'
+import { valueThrough, arrowAlong, bCircle, gCircle, polylines, type Pt, qCircles, R_MAJOR, R_MINOR, rCircle, sx, sy, vswrCircle, X_MAJOR, X_MINOR, xCircle, type Circle } from './geometry'
 import { around, mergeCoincident, placeLabels, textWidth, type Box, type LabelRequest } from './labels'
 
 /** One colour per network step, in order; the calculator's step list uses the same ones. */
@@ -485,7 +485,8 @@ function AnnotationShape({ a, endGap = 0 }: { a: Annotation; endGap?: number }) 
   const s = useChartScale()
   const color = a.color ?? 'var(--tutor)'
   const style = { color, stroke: color }
-  const v = a.value ?? 1
+  // A circle saved with only a point (before drawings were checked): the circle through that point.
+  const v = a.value ?? (a.gamma ? valueThrough(a.kind, a.gamma) : undefined) ?? 1
   let shape: React.ReactNode = null
   switch (a.kind) {
     case 'point':

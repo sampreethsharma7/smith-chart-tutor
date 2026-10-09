@@ -623,6 +623,16 @@ describe('questions that dig: why, spot the mistake, situations, check yourself'
     expect(useStudio.getState().exercise!.graded!.ctx).toBe('upper half, r < 1 → a g circle')
   })
 
+  it("a new lesson starts without the last lesson's drawings or zoom", async () => {
+    useStudio.getState().setAnnotations(() => [{ id: 'old', kind: 'point', gamma: { re: 0, im: 0 }, label: 'after series C' }])
+    useStudio.getState().setView({ cx: 0.2, cy: 0, half: 0.3 }, 'tutor', 'old zoom')
+    script.push(text('Hello.'))
+    await useTutor.getState().startSession()
+    await idle()
+    expect(useStudio.getState().annotations).toEqual([])
+    expect(useStudio.getState().tutorView).toBeNull()
+  })
+
   it('a check-yourself lesson verifies instead of teaching, on the skills with the least proof', async () => {
     app.profile = { ...app.profile, skills: { ...app.profile.skills, chart_basics: { mastery: 0.8, confidence: 0.5, evidence: 4, history: [] } } }
     script.push(text('This is a quick check: no teaching, just questions.'))
