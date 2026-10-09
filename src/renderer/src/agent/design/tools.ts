@@ -23,6 +23,8 @@ export interface Proposal {
   options: DesignOption[]
   /** Index of the option the user applied */
   applied?: number
+  /** Designed for a fixed impedance: the bandwidths are the network's alone */
+  fixedLoad?: boolean
 }
 
 export interface DesignContext extends ToolContext {
@@ -108,15 +110,18 @@ export function cardPartsText(els: NetworkElement[]): string {
 }
 
 /** The numbers for the model: compact, and the same ones the user sees on the card. */
-export function resultBrief(r: DesignResult, goal: DesignGoal) {
+export function resultBrief(r: DesignResult, goal: DesignGoal, fixedLoad = false) {
   return {
     at_f0: { freq: fmtHz(goal.f0), zin_ohm: fmtC(r.zin), vswr: r.vswr, return_loss_db: r.returnLossDb },
     ...(r.band ? { band: { range: `${fmtHz(r.band.low)}–${fmtHz(r.band.high)}`, worst_vswr: r.band.worstVswr, worst_at: fmtHz(r.band.worstAt), meets_target: r.band.meets } } : {}),
     matched_bandwidth: r.bandwidth
-      ? `${fmtHz(r.bandwidth.low)}–${fmtHz(r.bandwidth.high)} (${(r.bandwidth.fractional * 100).toFixed(1)}%)${r.bandwidth.clipped ? ', wider than the range searched or the data' : ''}`
+      ? `${fmtHz(r.bandwidth.low)}–${fmtHz(r.bandwidth.high)} (${(r.bandwidth.fractional * 100).toFixed(1)}%)${r.bandwidth.clipped ? ', wider than the range searched or the data' : ''}${fixedLoad ? '. NETWORK ONLY: the load is a fixed impedance, so a real load would be narrower; say so whenever you quote this' : ''}`
       : `none: VSWR at ${fmtHz(goal.f0)} is above ${goal.vswrMax}`
   }
 }
+
+/** Said whenever bandwidth is quoted for a fixed load, so nobody takes it for the real thing. */
+const FIXED_NOTE = ' The load is a fixed impedance (the same at every frequency), so these bandwidths come from the network alone. A real load changes with frequency and usually narrows them a lot: say so if you quote one, and suggest importing measured data or using a load model for a real answer.'
 
 const OWN: AgentTool[] = defineTools([
   {
@@ -130,12 +135,13 @@ const OWN: AgentTool[] = defineTools([
       const ZL = loadImpedance(s.load, goal.f0, s.datasets)
       const none = evaluateDesign(s.load, s.datasets, [], goal)
       const cands = matchCandidates(ZL, goal.z0, goal.f0)
+      const fixed = s.load.kind === 'fixed'
       return {
         load: `${describeLoad(s.load, s.datasets)}: ${fmtC(ZL, 'Ω')} at ${fmtHz(goal.f0)}`,
-        unmatched: resultBrief(none, goal),
+        unmatched: resultBrief(none, goal, fixed),
         target: `VSWR ≤ ${goal.vswrMax}${goal.band ? ` over ${fmtHz(goal.band.low)}–${fmtHz(goal.band.high)}` : ' at the design frequency'}`,
-        options: cands.map((c) => ({ id: c.id, family: c.family, parts: partsText(c.elements), elements: c.elements.map(({ kind, value }) => ({ kind, value })), detail: c.detail, ...resultBrief(evaluateDesign(s.load, s.datasets, c.elements, goal), goal) })),
-        note: 'Ideal parts. Pass the ones worth showing (with their elements) to propose_designs.'
+        options: cands.map((c) => ({ id: c.id, family: c.family, parts: partsText(c.elements), elements: c.elements.map(({ kind, value }) => ({ kind, value })), detail: c.detail, ...resultBrief(evaluateDesign(s.load, s.datasets, c.elements, goal), goal, fixed) })),
+        note: `Ideal parts. Pass the ones worth showing (with their elements) to propose_designs.${s.load.kind === 'fixed' ? FIXED_NOTE : ''}`
       }
     }
   },
@@ -148,7 +154,7 @@ const OWN: AgentTool[] = defineTools([
       const goal = goalOf(a, ctx)
       const s = ctx.studio
       const els = a.elements ? elementsOf(a.elements, goal) : s.network
-      return { parts: els.length ? partsText(els) : 'none (the bare load)', ...resultBrief(evaluateDesign(s.load, s.datasets, els, goal), goal) }
+      return { parts: els.length ? partsText(els) : 'none (the bare load)', ...resultBrief(evaluateDesign(s.load, s.datasets, els, goal), goal, s.load.kind === 'fixed') }
     }
   },
   {
@@ -190,9 +196,9 @@ const OWN: AgentTool[] = defineTools([
       const options = all.filter((o: DesignOption) => o.result.vswr <= limit)
       const dropped = all.filter((o: DesignOption) => !(o.result.vswr <= limit)).map((o: DesignOption) => `"${o.title}" (${partsText(o.elements)}: VSWR ${Number.isFinite(o.result.vswr) ? o.result.vswr.toFixed(1) : '∞'} at ${fmtHz(goal.f0)})`)
       if (!options.length) throw new Error(`None of these is matched at ${fmtHz(goal.f0)}: ${dropped.join('; ')}. Values are SI units (2.64 pF is 2.64e-12, 3.3 nH is 3.3e-9); take them from match_options or check_network. Nothing was shown.`)
-      d.propose({ id: uid('prop'), at: new Date().toISOString(), goal, options })
+      d.propose({ id: uid('prop'), at: new Date().toISOString(), goal, options, ...(s.load.kind === 'fixed' ? { fixedLoad: true } : {}) })
       return {
-        shown: options.map((o: DesignOption, i: number) => ({ option: i + 1, title: o.title, parts: partsText(o.elements), ...resultBrief(o.result, goal) })),
+        shown: options.map((o: DesignOption, i: number) => ({ option: i + 1, title: o.title, parts: partsText(o.elements), ...resultBrief(o.result, goal, s.load.kind === 'fixed') })),
         // Said plainly, so no reply can call a design broadband when the numbers say otherwise.
         ...(goal.band ? { band_verdict: options.some((o: DesignOption) => o.result.band?.meets) ? `Options ${options.map((o: DesignOption, i: number) => (o.result.band?.meets ? i + 1 : 0)).filter(Boolean).join(', ')} meet the band target.` : `NONE of these meets VSWR ≤ ${goal.vswrMax ?? 2} across ${fmtHz(goal.band.low)}–${fmtHz(goal.band.high)}. Tell the user plainly, with the best worst-case VSWR, and what would help (a different design frequency, more sections, accepting a narrower band).` } : {}),
         ...(dropped.length ? { not_shown: `Not matched at ${fmtHz(goal.f0)}, so left off the cards: ${dropped.join('; ')}. Check the values (SI units).` } : {}),

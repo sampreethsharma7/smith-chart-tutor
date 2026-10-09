@@ -74,9 +74,10 @@ const FRESH = () => ({
 })
 
 /** The option number in "apply 2", "ok, use option 1", "go with #3"; 0 when it isn't plainly a request to apply one. */
-export function applyRequest(text: string, count: number): number {
+export function applyRequest(text: string, count: number, recommended = 0): number {
   const t = text.toLowerCase()
   if (!count || /\b(don'?t|not|why|what if|how|compare|instead of)\b|\?/.test(t)) return 0
+  if (recommended && /\b(?:apply|use|go with|put on)\b.{0,24}\b(?:recommend(?:ed)?|your pick|best one)\b/.test(t)) return recommended
   const m = /\b(?:apply|use|go with|put on)\b[^.\d]{0,24}?(?:option|design|#|number|no\.?)?\s*(\d)\b/.exec(t)
   const n = m ? Number(m[1]) : 0
   return n >= 1 && n <= count ? n : 0
@@ -104,6 +105,9 @@ export const useDesigner = create<DesignerState>((set, get) => {
     set({ undo: st.network, proposal: { ...p, applied: option - 1 } })
     if (st.designFreq !== p.goal.f0) st.set('designFreq', p.goal.f0, `Design frequency set to ${fmtHz(p.goal.f0)} for the design`)
     st.set('network', o.elements.map((e) => ({ ...e })), `Applied design ${option} (${o.title}): ${partsText(o.elements)}`)
+    // Show how the design gets there: the path from the load to the match, element by element.
+    const ov = useStudio.getState().overlays
+    if (!ov.showPath || !ov.showInputTrace) useStudio.getState().setOverlays({ showPath: true, showInputTrace: true })
     // A design for a band: show the band, so the numbers on the card can be seen on the chart.
     const band = p.goal.band
     if (band) {
@@ -221,7 +225,8 @@ export const useDesigner = create<DesignerState>((set, get) => {
       pushItem({ kind: 'user', text })
       // "Apply option 2": the app does it, so it happens even if a model only says it did.
       let applied = ''
-      const n = applyRequest(text, get().proposal?.options.length ?? 0)
+      const prop = get().proposal
+      const n = applyRequest(text, prop?.options.length ?? 0, (prop?.options.findIndex((o) => o.recommended) ?? -1) + 1)
       if (n) {
         try {
           applied = `\n\n[The app applied option ${n} to their chart, as they asked. Don't apply it again.]`

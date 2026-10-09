@@ -3,7 +3,8 @@ import { useDesigner } from '@/agent/designer'
 import { useTutor } from '@/agent/tutor'
 import { cardPartsText, type DesignOption, type Proposal } from '@/agent/design/tools'
 import type { NetworkElement } from '@shared/rf/network'
-import { activeProvider } from '@/state/app'
+import { activeProvider, useApp } from '@/state/app'
+import type { ProviderConfig } from '@shared/llm'
 import { useStudio } from '@/state/studio'
 import { teachMeWhy } from '@/state/handoff'
 import { fmtHz } from '@/lib/format'
@@ -15,6 +16,15 @@ const STARTERS = [
   'What does my load look like across the band?'
 ]
 
+/** A word of caution about the model, when its rating (or an unrated local model) suggests one. */
+export function modelCaution(p: ProviderConfig | undefined, tier?: string): string | null {
+  if (!p) return null
+  if (tier && ['Usable', 'Limited', 'Failed'].includes(tier)) return `${p.label} is rated ${tier} on the Models page, so it may describe designs inaccurately.`
+  const local = /localhost|127\.0\.0\.1/.test(p.baseUrl ?? '')
+  if (!tier && local) return `${p.label} runs on this computer and hasn't been rated yet; small local models often describe designs inaccurately.`
+  return null
+}
+
 /** The Design tab's assistant: it matches the user's own load with them. Nothing here is graded. */
 export function DesignPanel() {
   const items = useDesigner((s) => s.items)
@@ -25,6 +35,8 @@ export function DesignPanel() {
   const hasNetwork = useStudio((s) => s.network.length > 0)
   const { send, stop, clear } = useDesigner.getState()
   const provider = activeProvider()
+  const bench = useApp((s) => (provider ? s.settings.benchmarks[provider.id] : undefined))
+  const weak = modelCaution(provider, bench?.tier)
   const [text, setText] = useState('')
   const scroller = useRef<HTMLDivElement>(null)
   const aside = useRef<HTMLElement>(null)
@@ -44,7 +56,7 @@ export function DesignPanel() {
       <ResizeHandle aside={aside} />
       <header className="tutor-head">
         <div>
-          <b>Design assistant</b> <span className="muted small">{provider ? provider.label : 'no model'}</span>
+          <b>Design assistant</b> <span className="muted small">{provider ? provider.label : 'no model'}{bench && <span className={`tier tier-${bench.tier.toLowerCase()}`}>{bench.tier}</span>}</span>
         </div>
         <div className="row">
           <button
@@ -58,6 +70,7 @@ export function DesignPanel() {
         </div>
       </header>
 
+      {weak && <div className="design-caution small">{weak} The numbers on the cards are always exact: the app computes them.</div>}
       <div className="messages" ref={scroller}>
         {items.length === 0 && (
           <div className="design-intro">
@@ -115,7 +128,7 @@ function Proposals({ p, busy }: { p: Proposal; busy: boolean }) {
         const applied = p.applied === i
         // Edited by hand since it was applied: Undo would throw those edits away, so it's no longer offered.
         const edited = applied && !sameNetwork(network, o.elements)
-        return <OptionCard key={i} o={o} n={i + 1} goal={goal} applied={applied} edited={edited} busy={busy} canUndo={!!undo && applied && !edited} />
+        return <OptionCard key={i} o={o} n={i + 1} goal={goal} fixedLoad={!!p.fixedLoad} applied={applied} edited={edited} busy={busy} canUndo={!!undo && applied && !edited} />
       })}
     </div>
   )
@@ -127,7 +140,7 @@ const vs = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '∞')
 const sameNetwork = (a: NetworkElement[], b: NetworkElement[]) =>
   a.length === b.length && a.every((e, i) => e.kind === b[i].kind && Math.abs(e.value - b[i].value) <= 1e-9 * Math.abs(b[i].value))
 
-function OptionCard({ o, n, goal, applied, edited, busy, canUndo }: { o: DesignOption; n: number; goal: Proposal['goal']; applied: boolean; edited: boolean; busy: boolean; canUndo: boolean }) {
+function OptionCard({ o, n, goal, fixedLoad, applied, edited, busy, canUndo }: { o: DesignOption; n: number; goal: Proposal['goal']; fixedLoad: boolean; applied: boolean; edited: boolean; busy: boolean; canUndo: boolean }) {
   const r = o.result
   const { apply, undoApply } = useDesigner.getState()
   const bw = r.bandwidth
@@ -158,6 +171,7 @@ function OptionCard({ o, n, goal, applied, edited, busy, canUndo }: { o: DesignO
             ? `${fmtHz(bw.low)}–${fmtHz(bw.high)} and beyond (the whole range checked)`
             : `${fmtHz(bw.low)}–${fmtHz(bw.high)} (${(bw.fractional * 100).toFixed(1)}%)`
           : 'not at the design frequency'}</span>
+        {bw && fixedLoad && <><span /><span className="muted" title="A fixed impedance is the same at every frequency, so only the network limits the bandwidth here. Import measured data or use a load model for a real answer.">network only: your load is a fixed impedance, a real one would be narrower</span></>}
       </div>
       {o.note && <div className="small">{o.note}</div>}
     </div>

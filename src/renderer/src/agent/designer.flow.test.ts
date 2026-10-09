@@ -122,13 +122,15 @@ describe('the design assistant', () => {
     expect(requests[1].messages.at(-1)!.parts.find((p) => p.type === 'tool_result')!.content).not.toMatch(/learner/i)
   })
 
-  it('applying a design made for a band shows that band on the chart', async () => {
+  it('applying a design made for a band shows that band on the chart, and the matching path', async () => {
     useStudio.getState().set('markers', [])
+    useStudio.getState().setOverlays({ showPath: false })
     script.push([call('propose_designs', { band: { low_hz: 2.3e9, high_hz: 2.5e9 }, options: [{ title: 'A', elements: GOOD }] })])
     script.push([say('One option.')])
     await useDesigner.getState().send('go')
     useDesigner.getState().apply(1)
     const s = useStudio.getState()
+    expect(s.overlays.showPath).toBe(true) // the curve from the load to the match, not just two points
     expect(s.showBand).toBe(true)
     expect(s.markers).toEqual([2.3e9, 2.5e9])
     expect(s.sweep.start).toBeLessThanOrEqual(2.3e9)
@@ -171,6 +173,8 @@ describe('"apply option 2" is done by the app', () => {
     expect(applyRequest('why would I use option 2?', 3)).toBe(0)
     expect(applyRequest('use 50 ohm', 3)).toBe(0)
     expect(applyRequest('apply option 1', 0)).toBe(0)
+    expect(applyRequest('go with the one you recommend', 3, 2)).toBe(2)
+    expect(applyRequest('apply the recommended one', 3, 0)).toBe(0) // none recommended
   })
 
   it('applies it before the model replies, so a model that only says it did can\'t fool anyone', async () => {
@@ -201,5 +205,15 @@ describe('the band verdict', () => {
     script.push([say('Done.')])
     await useDesigner.getState().send('go')
     expect(JSON.stringify(requests.at(-1)!.messages.at(-1))).toMatch(/NONE of these meets VSWR/)
+  })
+})
+
+describe('a fixed load', () => {
+  it('every quoted bandwidth says it is the network alone', async () => {
+    script.push([call('propose_designs', { options: [{ title: 'A', elements: GOOD }] })])
+    script.push([say('Done.')])
+    await useDesigner.getState().send('go')
+    expect(JSON.stringify(requests.at(-1)!.messages.at(-1))).toMatch(/NETWORK ONLY: the load is a fixed impedance/)
+    expect(useDesigner.getState().proposal!.fixedLoad).toBe(true)
   })
 })
