@@ -24,7 +24,7 @@ export function brief(m: PointMetrics) {
   }
 }
 
-const LOAD_SCHEMA = {
+export const LOAD_SCHEMA = {
   type: 'object',
   description: 'Load model. fixed: R,X (Ω). seriesRLC/parallelRLC: R (Ω), L (H), C (F) (0 = absent). antenna: topology series(dipole-like)|parallel(patch-like), f0_hz, R (Ω at resonance), Q.',
   properties: {

@@ -3,7 +3,7 @@ import type { Sure } from '@shared/profile'
 import { useTutor, type DisplayItem } from '@/agent/tutor'
 import { useStudio } from '@/state/studio'
 import { activeProvider, useApp } from '@/state/app'
-import { exerciseGoal } from '@/state/exercise'
+import { exerciseGoal, onProjectLoad, restoreProjectLoad } from '@/state/exercise'
 import { answerQuestion, checkExercise, revealValues, skipQuestion, unsureQuestion } from '@/agent/answers'
 import { Markdown } from '@/components/Markdown'
 import { FlagButton } from '@/components/Flag'
@@ -298,10 +298,15 @@ export function ResizeHandle({ aside }: { aside: React.RefObject<HTMLElement | n
 function ExerciseCard() {
   const ex = useStudio((s) => s.exercise)
   const busy = useTutor((s) => s.busy)
+  // Re-render when the load, Z0 or data change: a project task warns when they're no longer the project's.
+  useStudio((s) => s.load)
+  useStudio((s) => s.z0)
+  useStudio((s) => s.datasets)
   const [last, setLast] = useState<string | null>(null)
   useEffect(() => setLast(null), [ex?.id])
   if (!ex) return null
   const reach = ex.kind === 'reach'
+  const offProject = !!ex.capstone && !onProjectLoad(ex)
 
   const check = () => {
     const g = checkExercise()
@@ -322,6 +327,13 @@ function ExerciseCard() {
         {ex.allowedKinds?.length ? ` · allowed: ${ex.allowedKinds.map((k) => ELEMENT_LABEL[k]).join(', ')}` : ''}
       </div>
       {last && <div className={`grade ${last.startsWith('PASS') ? 'pass' : 'fail'}`}>{last}</div>}
+      {ex.capstone && !offProject && <div className="muted small">Your project's final task: it's graded on the project's own load.</div>}
+      {offProject && (
+        <div className="small warn">
+          The chart's load or Z0 has changed from your project's.{' '}
+          <button className="link small" onClick={() => setLast(restoreProjectLoad())}>Put the project's load back</button>
+        </div>
+      )}
       <div className="row">
         <button className="primary" onClick={check} disabled={busy}>
           {ex.status === 'passed' ? 'Passed ✓ · check again' : reach ? 'Check' : 'Check my match'}

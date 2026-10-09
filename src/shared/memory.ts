@@ -9,6 +9,7 @@ import { ANSWER_LOG_MAX, applyEvidence, lessonsOf, SKILLS, type Misconception, t
 import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOff } from './signoff'
 import { ladderBrief, moveOnLadder, type Rung } from './ladder'
 import { moveReading, readingBrief, readOff, type ValuesSeen } from './reading'
+import { capstoneBrief, stageOf } from './capstone'
 
 // ── Topics: the specific things a learner can be good or shaky at ───────────
 
@@ -382,6 +383,13 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
       ...(m.rung ? { rung: m.rung } : {}), ...(r.values ? { values: r.values } : {})
     }].slice(-ANSWER_LOG_MAX)
   }
+  // A judge project has no final task: it's done the moment this answer completes its route (kept done
+  // after a later slip, so it doesn't reopen).
+  const cap = profile.capstone
+  if (cap?.judge && !cap.done && stageOf(profile, cap) === 'done') {
+    profile.capstone = { ...cap, done: { at, session: r.session } }
+    notes.push('PROJECT COMPLETE: that answer finished their (judge) project; celebrate it and propose the next one with set_capstone')
+  }
   const name = topicDef(m.topic)!.name
   const levelMove = topic.level > (p.topics?.[m.topic]?.level ?? startLevel(p, m.topic)) ? ' (up)' : topic.level < (p.topics?.[m.topic]?.level ?? startLevel(p, m.topic)) ? ' (down)' : ''
   if (r.outcome === 'correct' && r.helped) notes.push('counted as partly right: they had help')
@@ -505,6 +513,7 @@ export function learnerBrief(p: Profile, now: string): BriefParts {
   }
   lines.push(ladderBrief(p, now))
   lines.push(readingBrief(p))
+  lines.push(capstoneBrief(p))
 
   const due = topics.filter(([, t]) => t.due <= now).sort((a, b) => a[1].box - b[1].box || a[1].due.localeCompare(b[1].due)).map(([id]) => id)
   const weak = topics.filter(([, t]) => topicState(t) === 'shaky').sort((a, b) => pct(a[1]) - pct(b[1])).map(([id]) => id)

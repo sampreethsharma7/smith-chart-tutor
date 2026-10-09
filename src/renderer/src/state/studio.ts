@@ -40,6 +40,11 @@ export interface Exercise {
   band?: { fLow: number; fHigh: number }
   maxElements?: number
   allowedKinds?: ElementKind[]
+  /**
+   * The final task of their project (capstone.ts): which project (its `at`), and the load and Z0 it is
+   * graded on, so passing it on another load doesn't count. Passing it completes that project.
+   */
+  capstone?: { at: string; load: LoadModel; z0: number; datasetName?: string }
   attempts: number
   status: 'active' | 'passed' | 'given_up'
   hints: string[]

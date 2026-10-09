@@ -10,6 +10,38 @@ import { aimFor, classifyMatch, inSituation, noteAsked, recordGraded, topicDef }
 import { regionOf } from '@shared/rf/tasks'
 import { matchIsGuided, rungOfMatch, withRung } from '@shared/ladder'
 import { fitRung, RUNG_REASON } from '../ladderFit'
+import { capstoneProblem, milestones, projectLoad as loadOfProject, stageOf, titleOf, type Capstone } from '@shared/capstone'
+import type { Dataset, LoadModel } from '@shared/rf/network'
+
+const LUMPED_KINDS: ElementKind[] = ['seriesL', 'seriesC', 'shuntL', 'shuntC']
+const LINE_KINDS: ElementKind[] = ['tline', 'openStub', 'shortStub']
+
+/**
+ * The final task of their project fills itself in from the project (capstone.ts), so it can't be
+ * watered down: its load, frequency, band, VSWR and parts. Only once every milestone is met.
+ */
+function capstoneTask(c: Capstone | undefined, a: any, datasets: Array<{ id: string; name: string }>): { args: any; load: LoadModel } {
+  if (!c) throw new Error('They have no project yet: set one with set_capstone first.')
+  if (c.judge) throw new Error('Their project is a judge project (no build): it is done when they judge worked matches (ask_spot_error), not with a task.')
+  if (c.done) throw new Error('Their project is already done: propose the next one with set_capstone.')
+  const load = loadOfProject(c, datasets as Dataset[])
+  if (!load) throw new Error(`Their project uses their data "${(c.load as { datasetName: string }).datasetName}", which isn't loaded now: ask them to import it again (Load panel), then set the task.`)
+  return {
+    load,
+    args: {
+      ...a,
+      freq_hz: c.f0,
+      max_vswr: c.maxVswr,
+      band_low_hz: c.band?.low,
+      band_high_hz: c.band?.high,
+      allowed_kinds: c.parts === 'lumped' ? LUMPED_KINDS : c.parts === 'lines' ? LINE_KINDS : undefined,
+      max_elements: undefined,
+      title: a.title || titleOf(c),
+      // The project's load and Z0, whatever the tutor passed (a different Z0 could ease the target).
+      scenario: { ...(a.scenario ?? {}), load: undefined, z0: c.z0 ?? 50 }
+    }
+  }
+}
 
 export default defineTools([
   {
@@ -28,22 +60,45 @@ export default defineTools([
         max_elements: { type: 'number' },
         allowed_kinds: { type: 'array', items: { type: 'string', enum: ELEMENT_KINDS } },
         scenario: { type: 'object', properties: SCENARIO_PROPS, description: 'Chart setup for the exercise (network is cleared automatically)' },
+        capstone: { type: 'boolean', description: 'The final task of their project (see Project in the brief): the app fills in its load, frequency, band, VSWR and parts. Only once every milestone is met.' },
         ...RUNG_REASON
       },
       required: ['title', 'instructions', 'freq_hz', 'max_vswr']
     },
     activity: (a) => `New exercise: ${a.title}`,
     endsTurn: true,
-    run(a, ctx) {
+    run(a0, ctx) {
+      let a = a0
+      let projectLoad: LoadModel | undefined
+      const project = a0.capstone ? ctx.profile?.()?.capstone : undefined
+      if (a0.capstone) {
+        const p = ctx.profile?.()
+        if (p && project && stageOf(p, project) === 'route') {
+          const left = milestones(p, project).filter((x) => !x.met).map((x) => x.words)
+          throw new Error(`Not yet: the project's final task opens when every milestone is met. Still to go: ${left.join('; ')}. Work toward those first.`)
+        }
+        const t = capstoneTask(project, a0, ctx.studio.datasets)
+        a = t.args
+        projectLoad = t.load
+      }
       if (!Number.isFinite(a.freq_hz) || a.freq_hz <= 0) throw new Error('freq_hz must be a positive number in Hz')
       // Feasibility check before touching the chart: a lumped-only exercise must have a
       // solution with practical part values, otherwise tell the model why.
       const before = ctx.studio.snapshot()
       applyScenario(ctx, { design_freq_hz: a.freq_hz, ...(a.scenario ?? {}), clear_network: true })
+      // Before reading the state: ctx.studio is a snapshot, and the checks below must see the project's load.
+      if (projectLoad) ctx.studio.setLoad(projectLoad, 'the final task of your project uses its own load')
       const s = ctx.studio
       const kinds: string[] = a.allowed_kinds ?? []
       const lumpedOnly = kinds.length > 0 && kinds.every((k) => !/tline|Stub/.test(k))
-      if (lumpedOnly || (kinds.length === 0 && (a.max_elements ?? 2) <= 2)) {
+      if (project) {
+        // The project's own check (across its band, with its parts), not the one-frequency L-match one below.
+        const problem = capstoneProblem(project, s.datasets)
+        if (problem) {
+          s.loadSnapshot({ ...before })
+          throw new Error(`The project can't be set as a task: ${problem}. Change the project with set_capstone (tell them why).`)
+        }
+      } else if (lumpedOnly || (kinds.length === 0 && (a.max_elements ?? 2) <= 2)) {
         const ZL = loadImpedance(s.load, a.freq_hz, s.datasets)
         const already = metricsFromZ(ZL, s.z0).vswr <= (a.max_vswr ?? 1.5)
         const practical = (k: string, v: number) => (k.endsWith('L') ? v >= 0.05e-9 && v <= 500e-9 : k.endsWith('C') ? v >= 0.01e-12 && v <= 500e-12 : true)
@@ -73,16 +128,21 @@ export default defineTools([
       const ZL = ctx.derived().design.load.z
       const kindsGiven = Array.isArray(a.allowed_kinds) ? a.allowed_kinds : undefined
       const instructions = String(a.instructions ?? '')
+      // The project's final task is rated by the project, not by how the tutor words it, and is never
+      // refused as too easy: its route already took them to the level it needs.
+      const named = project ? '' : instructions
       const graded = withRung(
-        inSituation(classifyMatch(kindsGiven ?? [], maxVswr, band, matchIsGuided(kindsGiven, instructions)), `${regionOf(ZL)}, ${band ? 'across a band' : 'one frequency'}`),
-        rungOfMatch(kindsGiven, maxVswr, band, instructions)
+        inSituation(classifyMatch(kindsGiven ?? [], maxVswr, band, matchIsGuided(kindsGiven, named)), `${regionOf(ZL)}, ${band ? 'across a band' : 'one frequency'}`),
+        rungOfMatch(kindsGiven, maxVswr, band, named)
       )
-      let fit: string
-      try {
-        fit = fitRung(ctx, graded, a.rung_reason)
-      } catch (e) {
-        s.loadSnapshot({ ...before }) // refused: leave the chart as it was
-        throw e
+      let fit = ''
+      if (!project) {
+        try {
+          fit = fitRung(ctx, graded, a.rung_reason)
+        } catch (e) {
+          s.loadSnapshot({ ...before }) // refused: leave the chart as it was
+          throw e
+        }
       }
       ctx.updateProfile?.((p) => noteAsked(p, { at: new Date().toISOString(), topic: graded.topic, difficulty: graded.difficulty, kind: 'match', text: String(a.title) }))?.catch?.(() => {})
       const aim = ctx.profile?.() ? aimFor(ctx.profile(), graded.topic) : undefined
@@ -99,7 +159,9 @@ export default defineTools([
         allowedKinds: a.allowed_kinds as ElementKind[] | undefined,
         attempts: 0,
         status: 'active',
-        hints: []
+        hints: [],
+        // Graded on the project's own load and Z0, and tied to this project (it may be changed while the card is open).
+        ...(project && projectLoad ? { capstone: { at: project.at, load: projectLoad, z0: s.z0, ...(project.load.kind === 'data' ? { datasetName: project.load.datasetName } : {}) } } : {})
       })
       return `Exercise card shown. Practises: ${topicDef(graded.topic)!.name} (${graded.topic}), level ${graded.difficulty}${aim !== undefined ? `; their aim for it is ${aim}` : ''}.${fit} Now wait for the learner to work on it; they will press Check or talk to you.`
     }

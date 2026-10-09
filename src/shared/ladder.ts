@@ -37,6 +37,8 @@ export const RUNGS_OF: Partial<Record<SkillId, Rung[]>> = {
   q_bandwidth: [1, 2, 4]
 }
 const rungsOf = (skill: SkillId): Rung[] => RUNGS_OF[skill] ?? [1, 2, 3, 4, 5]
+/** The rungs a skill has items for (RUNGS_OF), for code outside the ladder (capstone.ts). */
+export const rungsFor = rungsOf
 /** The highest rung this skill has at or below r (its lowest if none). */
 const snap = (skill: SkillId, r: number): Rung => [...rungsOf(skill)].reverse().find((x) => x <= r) ?? rungsOf(skill)[0]
 /** The next rung a streak can reach: judging is earned only by passing a judge item (a jump), never by a streak below it. */
@@ -329,6 +331,9 @@ const LEARNER_WORDS: Record<Rung, string> = {
   4: 'matching under limits (bands, tight targets, fewer parts)',
   5: 'checking worked solutions for mistakes'
 }
+
+/** What a rung means to the learner ("choosing the part yourself"). */
+export const rungWords = (r: Rung) => LEARNER_WORDS[r]
 
 /** For the Progress page: where they are on a skill and the next step up. */
 export function ladderLine(p: Profile, skill: SkillId): { now: string; next?: string; provisional: boolean } | null {

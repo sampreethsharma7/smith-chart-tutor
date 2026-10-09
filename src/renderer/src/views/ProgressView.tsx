@@ -8,6 +8,7 @@ import { forgetNote, misconceptionSignOff, topicDef } from '@shared/memory'
 import { isLive, patternsOf, type Pattern } from '@shared/patterns'
 import { SIGNOFF_WORDS, type SignOffStatus } from '@shared/signoff'
 import { Standing } from '@/components/Standing'
+import { ProjectCard } from '@/components/Project'
 
 export function ProgressView() {
   const profile = useApp((s) => s.profile)!
@@ -25,6 +26,8 @@ export function ProgressView() {
         <span className="spacer" />
         <button onClick={() => setView('assessment')}>{profile.assessment ? 'Retake placement test' : 'Take placement test'}</button>
       </div>
+
+      <ProjectCard profile={profile} />
 
       <Standing profile={profile} />
 

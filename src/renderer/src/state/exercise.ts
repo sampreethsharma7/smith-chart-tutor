@@ -66,6 +66,43 @@ export function reachMiss(Zbefore: Complex, last: NetworkElement, f: number, z0:
   return `their last part (${name}) ${way}; that takes a ${larger ? 'LARGER' : 'SMALLER'} value (about ${pct}% ${larger ? 'more' : 'less'}). Use these words; don't give the value.`
 }
 
+/**
+ * Whether the chart still has the project's load and Z0, for its final task. Compared by meaning, not
+ * by bytes: data by its name (importing the same file again gives it a new id), a model by its impedance
+ * at the task's frequencies within 1% (a value typed back from the rounded display still counts).
+ */
+export function onProjectLoad(ex: Exercise): boolean {
+  const p = ex.capstone
+  if (!p) return true
+  const s = useStudio.getState()
+  if (Math.abs(s.z0 - p.z0) > 1e-9) return false
+  if (p.datasetName !== undefined) {
+    return s.load.kind === 'data' && s.datasets.find((d) => d.id === (s.load as { datasetId: string }).datasetId)?.name === p.datasetName
+  }
+  if (s.load.kind === 'data') return false
+  const fs = [ex.freqHz, ...(ex.band ? [ex.band.fLow, ex.band.fHigh] : [])]
+  return fs.every((f) => {
+    const a = loadImpedance(s.load, f, s.datasets), b = loadImpedance(p.load, f, s.datasets)
+    return Math.hypot(a.re - b.re, a.im - b.im) <= 0.01 * Math.max(1e-9, Math.hypot(b.re, b.im))
+  })
+}
+
+/** Put the project's load and Z0 back on the chart (its data by name, if it was imported again). */
+export function restoreProjectLoad(): string | null {
+  const s = useStudio.getState()
+  const p = s.exercise?.capstone
+  if (!p) return null
+  let load = p.load
+  if (p.datasetName !== undefined) {
+    const ds = s.datasets.find((d) => d.name === p.datasetName)
+    if (!ds) return `Import "${p.datasetName}" again first (Load panel).`
+    load = { kind: 'data', datasetId: ds.id }
+  }
+  if (s.z0 !== p.z0) s.set('z0', p.z0)
+  useStudio.getState().setLoad(load, "put the project's load back")
+  return null
+}
+
 /** What the card says the task is, e.g. "VSWR ≤ 1.2 at 2.4 GHz" or "input on the g = 1 circle (±0.05) at 2.4 GHz". */
 export function exerciseGoal(ex: Exercise): string {
   if (ex.kind === 'reach' && ex.target) {
@@ -83,6 +120,10 @@ export function gradeExercise(ex: Exercise): ExerciseGrade {
   const violations: string[] = []
   if (ex.maxElements !== undefined && s.network.length > ex.maxElements) {
     violations.push(`uses ${s.network.length} elements (max ${ex.maxElements})`)
+  }
+  // The project's final task is about the project's load: passing it on another load or Z0 isn't the project.
+  if (ex.capstone && !onProjectLoad(ex)) {
+    violations.push(`the load or Z0 isn't the project's any more (use "Put the project's load back" on the card)`)
   }
   if (ex.allowedKinds?.length) {
     const bad = s.network.filter((e) => !ex.allowedKinds!.includes(e.kind))

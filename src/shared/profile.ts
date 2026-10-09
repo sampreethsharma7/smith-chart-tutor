@@ -5,6 +5,7 @@ import type { Slip } from './patterns'
 import type { Observation } from './signoff'
 import { rebuildLadder, type LadderState, type Rung } from './ladder'
 import type { ReadingState, ValuesSeen } from './reading'
+import type { Capstone } from './capstone'
 
 export type SkillId =
   | 'chart_basics'
@@ -221,6 +222,8 @@ export interface Profile {
   ladderPace?: number[]
   /** Per skill: whether reading questions show the values or cover them (reading.ts) */
   reading?: Partial<Record<SkillId, ReadingState>>
+  /** Their project, tied to their goal, and the route to it (capstone.ts) */
+  capstone?: Capstone
 }
 
 export interface NextFocus {

@@ -82,7 +82,23 @@ async function checkOnce(ex: NonNullable<ReturnType<typeof useStudio.getState>['
   // own is fully theirs; after several checks or talking it through with the tutor, partly.
   const report = firstPass ? await remember(ex.graded, 'correct', ex.title, { format: 'task', helped: !!ex.helped || next.attempts > 1 }) : ''
   const miss = g.tutorNote ? `\n[Which way they missed, from the app] ${g.tutorNote}` : ''
-  await useTutor.getState().send(`[${what} check #${next.attempts}] ${g.summary}. Network (load → source): ${net}.${miss}${solved}${report ? `\n[Learner memory] ${report}` : ''}`, {
+  // The final task of their project, passed: the project is done (capstone.ts).
+  let project = ''
+  if (firstPass && ex.capstone) {
+    const forProject = ex.capstone.at
+    const session = useTutor.getState().session?.id
+    let marked = false
+    // Only the project this card was set for (they may have changed it on Progress while it was open).
+    await useApp.getState().updateProfile((p) => {
+      if (!p.capstone || p.capstone.done || p.capstone.at !== forProject) return p
+      marked = true
+      return { ...p, capstone: { ...p.capstone, done: { at: new Date().toISOString(), ...(session ? { session } : {}) } } }
+    })
+    project = marked
+      ? '\n[Project complete] That was the final task of their project: it is now marked done on their Progress page. Celebrate it specifically (what they can now do for their real goal), then propose the next, harder project with set_capstone.'
+      : '\n[Project task] They passed the final task of a project they have since changed on Progress: praise the work; their current project is not marked done.'
+  }
+  await useTutor.getState().send(`[${what} check #${next.attempts}] ${g.summary}. Network (load → source): ${net}.${miss}${project}${solved}${report ? `\n[Learner memory] ${report}` : ''}`, {
     learnerAction: true,
     display: `✔ Checked (#${next.attempts}): ${g.summary}`,
     followUp: firstPass,

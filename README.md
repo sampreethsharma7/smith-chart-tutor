@@ -6,7 +6,7 @@
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-433%20passing-34d399">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-463%20passing-34d399">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-a78bfa">
 </p>
 
@@ -73,6 +73,8 @@ Progress shows how well you judge yourself, so you can tell whether you're under
 - A skill only becomes **strong** with proof: right answers on your own, in two lessons, at medium difficulty or harder, in two different situations. Until then it shows as *provisional*.
 
 **The tutor hands over more as you go.** An independence ladder tracks how much of each task you decide: guided, then choosing the part, then planning whole matches, then matching under limits, then checking worked solutions. It moves at your own pace, and the app refuses tasks that are too easy for where you are. Reading questions cover the numbers the app would otherwise show (readout, hover values, tables) once you can read them from the chart, so a copied number never counts as reading the chart.
+
+**A project to aim for.** Your tutor turns your goal into a real project, such as matching your own antenna across its band, and shows the route to it on Progress. Each step is ticked from your own answers, and every lesson ends with the next step toward it.
 
 </td>
 </tr>

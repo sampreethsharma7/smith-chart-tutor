@@ -4,6 +4,7 @@ import { useTutor } from '@/agent/tutor'
 import { activeProvider, useApp } from '@/state/app'
 import { modelReady, startLesson } from '@/state/journey'
 import { LessonWrapUp } from './LessonWrapUp'
+import { UpNext } from './Project'
 
 type Choice = 'auto' | 'own' | 'probe' | SkillId
 
@@ -41,6 +42,8 @@ export function LessonLauncher() {
       {!lastEnded && last?.summary && (
         <p className="summary"><span className="muted small">Last time: </span>{last.summary}</p>
       )}
+      {/* What this lesson moves them toward (their project, or the next step up): the wrap-up shows it when there is one. */}
+      {!lastEnded && <UpNext profile={profile} />}
       {n === 1 && (
         <p className="small">
           The tutor sets a goal for the lesson, gives you tasks on this chart, asks you to predict before you check, and nudges you when you're stuck.

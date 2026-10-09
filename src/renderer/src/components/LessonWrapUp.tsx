@@ -1,5 +1,6 @@
 import { skillChanges, skillName, type SessionRecord } from '@shared/profile'
 import { useApp } from '@/state/app'
+import { UpNext } from './Project'
 
 export function OutcomeBadge({ s }: { s: SessionRecord }) {
   if (s.outcome === 'completed') return <span className="chip ok">✓ goal reached</span>
@@ -12,7 +13,8 @@ export function OutcomeBadge({ s }: { s: SessionRecord }) {
 
 /** What a lesson achieved: the goal, the tutor's recap and how the learner's skills moved. */
 export function LessonWrapUp({ s, n }: { s: SessionRecord; n: number }) {
-  const skills = useApp((st) => st.profile!.skills)
+  const profile = useApp((st) => st.profile!)
+  const skills = profile.skills
   const setView = useApp((st) => st.setView)
   const changes = skillChanges(s, skills)
   const passed = s.exercises.filter((e) => e.passed).length
@@ -48,7 +50,8 @@ export function LessonWrapUp({ s, n }: { s: SessionRecord; n: number }) {
       )}
       {changes.length === 0 && <div className="small muted">No skill estimates changed this time: the tutor needs to see you work a little more.</div>}
       {s.exercises.length > 0 && <div className="small">{passed} of {s.exercises.length} task{s.exercises.length > 1 ? 's' : ''} and question{s.exercises.length > 1 ? 's' : ''} right</div>}
-      {s.recap?.practiseNext && <div className="small"><span className="muted">Next:</span> {s.recap.practiseNext}</div>}
+      <UpNext profile={profile} />
+      {s.recap?.practiseNext && <div className="small"><span className="muted">Your tutor suggests:</span> {s.recap.practiseNext}</div>}
       <button className="link" onClick={() => setView('progress')}>See all your progress</button>
     </div>
   )

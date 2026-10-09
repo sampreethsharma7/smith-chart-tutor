@@ -1259,3 +1259,192 @@ describe('item 4: fixes from the 12-lesson novice test', () => {
     expect(useStudio.getState().pinned).toBeNull()
   })
 })
+
+describe('item 5: a project from their goal, the route to it, and its final task', () => {
+  const AT = new Date().toISOString()
+  const ANTENNA = { kind: 'antenna', topology: 'series', f0_hz: F, R: 15, Q: 6 } // VSWR 3.3 at resonance: something to match
+  /** Every milestone of a lumped project at one frequency, confirmed by answers. */
+  const routeDone = () => {
+    const r = (rung: number) => ({ rung, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT })
+    const c = { stage: 'chart', streak: 0, misses: 0, source: 'answers', at: AT }
+    app.profile = { ...app.profile, ladder: { lumped_moves: r(2), l_match: r(3) }, reading: { chart_basics: c, reflection: c, admittance: c } }
+  }
+
+  it('set_capstone saves it with its route; the tutor is told how far they are', async () => {
+    const r = await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'Your goal is your own 2.4 GHz antenna.' }, ctx)
+    expect(r.isError).toBe(false)
+    expect(app.profile.capstone).toMatchObject({ f0: F, maxVswr: 2, parts: 'lumped', setBy: 'tutor', why: 'Your goal is your own 2.4 GHz antenna.' })
+    expect(r.content).toMatch(/Project saved and shown on their Progress page: "Match a 2\.4 GHz dipole-like antenna at 2\.4 GHz to VSWR ≤ 2 with L and C parts"\. Route \(0 of 5 met\)/)
+  })
+
+  it('the tutor can\'t replace a project the learner chose, unless they asked', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, why: 'x' }, ctx)
+    app.profile = { ...app.profile, capstone: { ...app.profile.capstone, setBy: 'learner' } }
+    const r = await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 1.5, why: 'y' }, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/The learner chose their project themselves on Progress/)
+    expect((await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 1.5, why: 'y', learner_asked: true }, ctx)).isError).toBe(false)
+    expect(app.profile.capstone.maxVswr).toBe(1.5)
+  })
+
+  it('"their data" needs data; with none the tutor is told what to do instead', async () => {
+    const r = await runTool('set_capstone', { use_their_data: true, f0_hz: F, max_vswr: 2, why: 'x' }, ctx)
+    expect(r.content).toMatch(/They have no imported data yet/)
+  })
+
+  it('the final task is refused until every milestone is met, and says what is left', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    const r = await runTool('create_exercise', { title: 'Project', instructions: 'Match it.', freq_hz: F, max_vswr: 3, capstone: true }, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/Not yet: the project's final task opens when every milestone is met\. Still to go: Chart anatomy/)
+    expect(useStudio.getState().exercise).toBeNull()
+  })
+
+  it('once open, the final task uses the project\'s own load, frequency, VSWR and parts (it can\'t be watered down); passing it completes the project', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 1.5, parts: 'lumped', why: 'x' }, ctx)
+    routeDone()
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 50, X: 0 } })
+    const r = await runTool('create_exercise', { title: 'Your project', instructions: 'Match your antenna.', freq_hz: 1e9, max_vswr: 3, allowed_kinds: ['shuntR'], capstone: true }, ctx)
+    expect(r.isError, r.content).toBe(false)
+    const ex = useStudio.getState().exercise!
+    expect(ex).toMatchObject({ capstone: { at: app.profile.capstone.at, z0: 50 }, freqHz: F, maxVswr: 1.5, allowedKinds: ['seriesL', 'seriesC', 'shuntL', 'shuntC'] })
+    expect(useStudio.getState().load).toMatchObject({ kind: 'antenna', f0: F, R: 15, Q: 6 })
+    // Solve it and press Check.
+    const { solveLMatch } = await import('@shared/rf/solvers')
+    const { loadImpedance } = await import('@shared/rf/network')
+    const sol = solveLMatch(loadImpedance(useStudio.getState().load, F, []), 50, F)[0]
+    for (const e of sol.elements) useStudio.getState().addElement(e.kind, e.value)
+    script.push(text('You did it!'))
+    expect((await checkExerciseAsync())?.passed).toBe(true)
+    await idle()
+    expect(app.profile.capstone.done).toBeTruthy()
+    expect(lastUserText(requests[0])).toMatch(/\[Project complete\] That was the final task of their project/)
+  })
+
+  it('review: a typical band project opens its final task (judged across the band, not "already matched" at f0)', async () => {
+    // A dipole across 2.3–2.5 GHz: VSWR 1.46 at resonance, but well over 2 at the band edges.
+    const dipole = { kind: 'antenna', topology: 'series', f0_hz: 2.4e9, R: 73, Q: 10 }
+    const set = await runTool('set_capstone', { load: dipole, f0_hz: 2.4e9, band_low_hz: 2.3e9, band_high_hz: 2.5e9, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    expect(set.isError, set.content).toBe(false)
+    routeDone()
+    app.profile = { ...app.profile, ladder: { ...app.profile.ladder, q_bandwidth: { rung: 4, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT } } }
+    const r = await runTool('create_exercise', { title: 'Project', instructions: 'Use a shunt C then a series L.', freq_hz: F, max_vswr: 3, capstone: true }, ctx)
+    expect(r.isError, r.content).toBe(false)
+    expect(useStudio.getState().exercise).toMatchObject({ band: { fLow: 2.3e9, fHigh: 2.5e9 }, maxVswr: 2 })
+  })
+
+  it('review: a project that already meets its target is refused when it is set, with a reason', async () => {
+    const r = await runTool('set_capstone', { load: { kind: 'antenna', topology: 'series', f0_hz: F, R: 50, Q: 6 }, f0_hz: F, max_vswr: 2, why: 'x' }, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/That project can't work: the load already meets VSWR ≤ 2 there/)
+  })
+
+  it('review: the final task is never refused as too easy, even for a learner at the judge rung or with parts named', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    routeDone()
+    app.profile = { ...app.profile, ladder: { ...app.profile.ladder, l_match: { rung: 5, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT } } }
+    const r = await runTool('create_exercise', { title: 'Project', instructions: 'Use a shunt C then a series L.', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
+    expect(r.isError, r.content).toBe(false)
+    expect(useStudio.getState().exercise?.graded?.rung).toBe(3) // rated by the project, not the wording
+  })
+
+  it('review: passing the final task on another load, or for a project changed since, does not complete the project', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    routeDone()
+    await runTool('create_exercise', { title: 'Project', instructions: 'Match it.', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
+    const { gradeExercise } = await import('@/state/exercise')
+    useStudio.getState().setLoad({ kind: 'fixed', R: 50, X: 0 })
+    const g = gradeExercise(useStudio.getState().exercise!)
+    expect(g.passed).toBe(false)
+    expect(g.summary).toMatch(/the load or Z0 isn't the project's any more/)
+    // Back on the project's load, solved, but the learner changed the project meanwhile.
+    useStudio.getState().setLoad(useStudio.getState().exercise!.capstone!.load)
+    const { solveLMatch } = await import('@shared/rf/solvers')
+    const { loadImpedance } = await import('@shared/rf/network')
+    for (const e of solveLMatch(loadImpedance(useStudio.getState().load, F, []), 50, F)[0].elements) useStudio.getState().addElement(e.kind, e.value)
+    app.profile = { ...app.profile, capstone: { ...app.profile.capstone, maxVswr: 1.5, setBy: 'learner', at: new Date(Date.now() + 1000).toISOString() } }
+    script.push(text('Well done.'))
+    expect((await checkExerciseAsync())?.passed).toBe(true)
+    await idle()
+    expect(app.profile.capstone.done).toBeUndefined()
+    expect(lastUserText(requests[0])).toMatch(/\[Project task\] They passed the final task of a project they have since changed/)
+  })
+
+  it('review: a judge project is saved as done when its route completes, and can then be replaced', async () => {
+    const { recordGraded } = await import('@shared/memory')
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, judge: true, why: 'Interview prep.' }, ctx)
+    routeDone()
+    app.profile = { ...app.profile, capstone: { ...app.profile.capstone, setBy: 'learner' }, ladder: { ...app.profile.ladder, l_match: { rung: 4, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT } } }
+    const r = recordGraded(app.profile, { meta: { topic: 'l_match', skill: 'l_match', difficulty: 3, rung: 5 }, outcome: 'correct', label: 'spot the mistake', session: 'L1', at: AT, sure: 'sure' })
+    expect(r.profile.capstone!.done).toBeTruthy()
+    expect(r.report).toMatch(/PROJECT COMPLETE/)
+    app.profile = r.profile
+    expect((await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'Next.' }, ctx)).isError).toBe(false)
+  })
+
+  it('review: "their data" must cover the project frequencies; no silent fallback', async () => {
+    useStudio.setState({ datasets: [{ id: 'd1', name: 'patch.s1p', source: 'Touchstone .s1p', z0: 50, freqs: [1e9, 1.5e9], gamma: [{ re: 0.5, im: 0 }, { re: 0.5, im: 0.1 }] }] } as any)
+    const r = await runTool('set_capstone', { use_their_data: true, f0_hz: F, max_vswr: 2, why: 'x' }, ctx)
+    expect(r.content).toMatch(/None of their data covers that frequency: patch\.s1p \(1\.000–1\.500 GHz\)/)
+    useStudio.setState({ datasets: [] } as any)
+  })
+
+  it('re-review: a band no network can reach (Bode–Fano) is refused when set; a reachable one is accepted', async () => {
+    const patch = (Q: number) => ({ kind: 'antenna', topology: 'parallel', f0_hz: 2.44e9, R: 150, Q })
+    const hard = await runTool('set_capstone', { load: patch(60), f0_hz: 2.44e9, band_low_hz: 2.4e9, band_high_hz: 2.48e9, max_vswr: 1.2, why: 'x' }, ctx)
+    expect(hard.isError).toBe(true)
+    expect(hard.content).toMatch(/the band is wider than any matching network can reach for this load \(its Q is about 60: at most 2\.2% of 2\.44 GHz at VSWR ≤ 1\.2, and the band is 3\.3%\)/)
+    expect((await runTool('set_capstone', { load: patch(8), f0_hz: 2.44e9, band_low_hz: 2.4e9, band_high_hz: 2.48e9, max_vswr: 2, why: 'x' }, ctx)).isError).toBe(false)
+  })
+
+  it('re-review: the final task uses the project\'s Z0, whatever the tutor passes', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    routeDone()
+    const r = await runTool('create_exercise', { title: 'P', instructions: 'Match it.', freq_hz: F, max_vswr: 2, capstone: true, scenario: { z0: 75 } }, ctx)
+    expect(r.isError, r.content).toBe(false)
+    expect(useStudio.getState().z0).toBe(50)
+    expect(useStudio.getState().exercise?.capstone?.z0).toBe(50)
+  })
+
+  it('re-review: the load check goes by meaning (a value typed back from the rounded display counts); the card can put the load back', async () => {
+    const { onProjectLoad, restoreProjectLoad } = await import('@/state/exercise')
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    routeDone()
+    await runTool('create_exercise', { title: 'P', instructions: 'Match it.', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
+    const ex = () => useStudio.getState().exercise!
+    useStudio.getState().setLoad({ kind: 'antenna', topology: 'series', f0: F, R: 15.0004, Q: 6 }) // retyped, a hair off
+    expect(onProjectLoad(ex())).toBe(true)
+    useStudio.getState().setLoad({ kind: 'antenna', topology: 'series', f0: F, R: 25, Q: 6 })
+    expect(onProjectLoad(ex())).toBe(false)
+    expect(restoreProjectLoad()).toBeNull()
+    expect(onProjectLoad(ex())).toBe(true)
+  })
+
+  it('re-review: their data, imported again under a new id, is still the project\'s data', async () => {
+    const { onProjectLoad } = await import('@/state/exercise')
+    const ds = (id: string) => ({ id, name: 'patch.s1p', source: 'Touchstone .s1p', z0: 50, freqs: [2.3e9, 2.4e9, 2.5e9], gamma: [{ re: 0.6, im: 0.2 }, { re: 0.5, im: 0 }, { re: 0.6, im: -0.2 }] })
+    useStudio.setState({ datasets: [ds('d1')] } as any)
+    const set = await runTool('set_capstone', { use_their_data: true, f0_hz: 2.4e9, max_vswr: 1.5, parts: 'lumped', why: 'x' }, ctx)
+    expect(set.isError, set.content).toBe(false)
+    routeDone()
+    const r = await runTool('create_exercise', { title: 'P', instructions: 'Match it.', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
+    expect(r.isError, r.content).toBe(false)
+    useStudio.setState({ datasets: [ds('d2')] } as any)
+    useStudio.getState().setLoad({ kind: 'data', datasetId: 'd2' })
+    expect(onProjectLoad(useStudio.getState().exercise!)).toBe(true)
+    useStudio.setState({ datasets: [] } as any)
+  })
+
+  it('re-review: a judge project set with its route already complete is done at once', async () => {
+    routeDone()
+    app.profile = { ...app.profile, ladder: { ...app.profile.ladder, l_match: { rung: 5, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT } } }
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, judge: true, why: 'Interview prep.' }, ctx)
+    expect(app.profile.capstone.done).toBeTruthy()
+  })
+
+  it('a judge project has no build task', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, judge: true, why: 'Interview prep.' }, ctx)
+    const r = await runTool('create_exercise', { title: 'P', instructions: 'x', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
+    expect(r.content).toMatch(/Not yet|judge project/)
+  })
+})
