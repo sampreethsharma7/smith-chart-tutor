@@ -778,7 +778,8 @@ async function loadConversation(profileId: string) {
   useTutor.setState({
     profileId,
     ...FRESH(),
-    items: [...c.items, note],
+    // One "in progress since" note: the latest. (Each launch used to add another.)
+    items: [...c.items.filter((i) => !(i.kind === 'system' && i.text.startsWith('Lesson in progress since '))), note],
     history: c.history,
     // Lessons saved before coordinates were recorded: infer them, or mark them unknown (never assume impedance).
     session: c.session ? migrateLessonState(c.session) : c.session,
