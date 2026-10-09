@@ -3,6 +3,7 @@ import type { Profile, SkillId } from '@shared/profile'
 import { skillName } from '@shared/profile'
 import { calibrationOf } from '@shared/memory'
 import { ladderLine } from '@shared/ladder'
+import { readingLine } from '@shared/reading'
 import { startLesson } from '@/state/journey'
 import {
   BENCHMARKS, overall, plannedFocus, probeTargets, skillStanding, topicStanding, ZONES,
@@ -105,11 +106,16 @@ export function Standing({ profile }: { profile: Profile }) {
   )
 }
 
-/** How much of a task they do on their own in this skill (the independence ladder), and the next step up. */
+/**
+ * How much of a task they do on their own in this skill (the independence ladder), and the next step
+ * up; for the reading skills, whether they read values from the chart or the readout (reading.ts).
+ */
 function Independence({ profile, skill }: { profile: Profile; skill: SkillId }) {
-  const l = ladderLine(profile, skill)
+  const ladder = ladderLine(profile, skill)
+  const l = ladder ?? readingLine(profile, skill)
   if (!l) return null
-  const title = `How much of each task you decide yourself: your tutor pitches tasks here${l.provisional ? ' (an estimate until your next answer in this skill)' : ''}.${l.next ? ` Next step up: ${l.next}.` : ''}`
+  const what = ladder ? 'How much of each task you decide yourself: your tutor pitches tasks here' : 'How you answer reading questions: from the chart (values covered, counts fully) or off the readout (counts partly)'
+  const title = `${what}${l.provisional ? ' (an estimate until your next answer in this skill)' : ''}.${l.next ? ` Next step up: ${l.next}.` : ''}`
   return <span className="ladder-indep" title={title}>Now: {l.now}{l.provisional ? ' (estimate)' : ''}</span>
 }
 

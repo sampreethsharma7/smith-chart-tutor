@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CONVERT_FROM, type ConvertFrom, type NetworkStep, type Step } from '@shared/rf/calc'
 import { zFromGamma } from '@shared/rf/metrics'
-import { useStudio } from '@/state/studio'
+import { useStudio, valuesCovered } from '@/state/studio'
 import { useDerived } from '@/state/derived'
-import { addComponent, convertLocked, pointText, runCalc, useCalc, type CalcInputs, type CalcTab } from '@/state/calc'
+import { addComponent, convertLocked, networkLocked, pointText, runCalc, useCalc, type CalcInputs, type CalcTab } from '@/state/calc'
 import { Tex } from '@/components/Tex'
 import { cplx } from '@shared/rf/calc'
 import { fmtHz } from '@/lib/format'
@@ -27,7 +27,7 @@ export function CalcPanel() {
   const prediction = useStudio((s) => s.prediction)
   const designFreq = useStudio((s) => s.designFreq)
   const z0 = useStudio((s) => s.z0)
-  const locked = c.tab === 'convert' && convertLocked()
+  const locked = (c.tab === 'convert' && convertLocked()) || (c.tab === 'network' && networkLocked())
   const out = useMemo(() => (locked ? {} : runCalc(c)), [c, locked, prediction, chart]) // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<CalcInputs>) => c.set(patch, 'learner')
 
@@ -63,6 +63,7 @@ export function CalcPanel() {
           </div>
           {c.tab === 'convert' && (locked ? <div className="muted small">The converter is paused while a "read this value" question is open: that question is about working it out yourself. The other tabs still work.</div> : <ConvertInputs c={c} set={set} />)}
           {c.tab === 'component' && <ComponentInputs c={c} set={set} />}
+          {c.tab === 'network' && locked && <div className="muted small">Paused while a reading question is open: it lists the values that would answer it. It comes back when you answer.</div>}
           {out.error && <div className="muted small">{out.error}</div>}
           {out.result && (
             <>
@@ -108,7 +109,10 @@ function Pickers({ onPick, as }: { onPick(text: string): void; as: 'z' | 'y' | '
   const has = useStudio((s) => s.network.length > 0)
   const pinned = useStudio((s) => s.pinned)
   const z0 = useStudio((s) => s.z0)
+  const covered = useStudio(valuesCovered)
   const norm = (Z: { re: number; im: number }) => ({ re: Z.re / z0, im: Z.im / z0 })
+  // They'd fill in the exact z or y of the point a reading question asks about.
+  if (covered) return <div className="pickers small muted">Picking points from the chart is paused while a reading question is open.</div>
   return (
     <div className="pickers small">
       <span className="muted">from the chart:</span>

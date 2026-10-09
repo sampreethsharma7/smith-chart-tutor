@@ -298,7 +298,7 @@ export function checkRung(p: Profile, m: GradedMeta, opts: { reason?: string; us
   }
 }
 
-const lastOn = (p: Profile, skill: SkillId) => [...(p.answers ?? [])].reverse().find((a) => a.skill === skill)
+export const lastOn = (p: Profile, skill: SkillId) => [...(p.answers ?? [])].reverse().find((a) => a.skill === skill)
 
 // ── Words for the tutor and the learner ────────────────────────────────────
 

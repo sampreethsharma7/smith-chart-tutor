@@ -69,7 +69,16 @@ export interface Prediction {
   graded?: GradedMeta
   /** The learner talked it through with the tutor while it was open */
   helped?: boolean
+  /** Reading questions: the app covers the on-screen values while it's open, or shows them (reading.ts) */
+  values?: 'covered' | 'shown'
+  /** They pressed "Show values" on a covered question (the answer then counts partly) */
+  revealed?: boolean
+  /** A click question answered by typing the point (the keyboard way): counts partly on a reading question */
+  typed?: boolean
 }
+
+/** A reading question is open with its values covered: panels hide the numbers that would answer it. */
+export const valuesCovered = (s: { prediction: Prediction | null }) => s.prediction?.values === 'covered' && !s.prediction.revealed
 
 export interface ChartEvent {
   at: number

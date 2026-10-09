@@ -1,6 +1,6 @@
 import { metricsFromGamma, type PointMetrics } from '@shared/rf/metrics'
 import type { Band } from '@shared/rf/network'
-import { useHover, useStudio } from '@/state/studio'
+import { useHover, useStudio, valuesCovered } from '@/state/studio'
 import { resultRows, useDerived } from '@/state/derived'
 import { fmtC, fmtDb, fmtEng, fmtHz, fmtNum } from '@/lib/format'
 
@@ -12,6 +12,7 @@ export function InspectCard() {
   const z0 = useStudio((s) => s.z0)
   const network = useStudio((s) => s.network)
   const d = useDerived()
+  const covered = useStudio(valuesCovered)
   let title: string
   let m: PointMetrics
   if (hover && snap) {
@@ -29,10 +30,18 @@ export function InspectCard() {
   }
   return (
     <div className="inspect">
-      <h4>{title}</h4>
-      <MetricGrid m={m} />
+      <h4>{covered ? 'Values' : title}</h4>
+      {covered ? <CoveredNote /> : <MetricGrid m={m} />}
     </div>
   )
+}
+
+/** In place of numbers that would answer the open reading question (reading.ts). */
+export function CoveredNote({ inline }: { inline?: boolean }) {
+  const text = 'Covered while you answer: read it from the chart.'
+  return inline
+    ? <span className="covered-note" title="They come back when you answer. Show values on the question card uncovers them, but the answer then counts partly.">covered</span>
+    : <div className="covered-note" title="They come back when you answer. Show values on the question card uncovers them, but the answer then counts partly.">{text}</div>
 }
 
 export function MetricGrid({ m }: { m: PointMetrics }) {
@@ -78,6 +87,8 @@ export function MarkerTable() {
   const has = network.length > 0
   const band = useStudio((s) => s.showBand)
   const rows = resultRows(d, band)
+  const covered = useStudio(valuesCovered)
+  if (covered) return <div className="marker-table"><CoveredNote /></div>
   return (
     <div className="marker-table">
       <table>

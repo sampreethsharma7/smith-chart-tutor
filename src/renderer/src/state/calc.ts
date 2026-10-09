@@ -7,7 +7,7 @@ import {
 } from '@shared/rf/calc'
 import { ELEMENT_LABEL } from '@shared/rf/network'
 import { parseEng } from '@/lib/format'
-import { useStudio } from './studio'
+import { useStudio, valuesCovered } from './studio'
 import { computeDerived } from './derived'
 
 export type CalcTab = 'convert' | 'component' | 'network'
@@ -94,8 +94,12 @@ export function pointText(z: Complex, as: 'z' | 'y' | 'Z'): string {
  */
 export function convertLocked(): boolean {
   const p = useStudio.getState().prediction
-  return !!p && !p.answered && p.key?.type === 'value'
+  // A value question with the values shown (the readout stage) leaves it open: the readout shows them anyway.
+  return (!!p && !p.answered && p.key?.type === 'value' && p.values !== 'shown') || valuesCovered(useStudio.getState())
 }
+
+/** The network tab lists z after each part: paused while a reading question covers the values. */
+export const networkLocked = (): boolean => valuesCovered(useStudio.getState())
 
 /** A graded task or question is open: calculator use is noted as such for the tutor. */
 function gradedOpen(): string {
@@ -140,7 +144,7 @@ export const useCalc = create<CalcState>((set, get) => ({
     set({ highlight })
   },
   logUse() {
-    if (get().tab === 'convert' && convertLocked()) return
+    if ((get().tab === 'convert' && convertLocked()) || (get().tab === 'network' && networkLocked())) return
     const r = runCalc(get())
     if (r.summary) useStudio.getState().logEvent('calc', `Used the calculator${gradedOpen()}: ${r.summary}`)
   },

@@ -3,7 +3,7 @@ import { abs, type Complex } from '@shared/rf/complex'
 import { gammaFromZ, metricsFromGamma, zFromGamma } from '@shared/rf/metrics'
 import { admittanceOf, type Target } from '@shared/rf/tasks'
 import { ELEMENT_LABEL, nearestOnTrace } from '@shared/rf/network'
-import { useStudio, useHover, type Annotation } from '@/state/studio'
+import { useStudio, useHover, valuesCovered, type Annotation } from '@/state/studio'
 import { useDerived } from '@/state/derived'
 import { useCalc } from '@/state/calc'
 import { fmtC, fmtHz, fmtNum, fmtDb } from '@/lib/format'
@@ -83,6 +83,7 @@ export function StudioChart() {
   const hover = useHover((s) => s.gamma)
   const setHover = useHover((s) => s.set)
   const [guides, setGuides] = useState(true)
+  const covered = useStudio(valuesCovered)
   const view = useStudio((s) => s.view)
   const tutorView = useStudio((s) => s.tutorView)
   const setView = (v: ChartView | ((v: ChartView) => ChartView)) =>
@@ -92,6 +93,8 @@ export function StudioChart() {
 
   const onPick = (g: Complex) => {
     const st = useStudio.getState()
+    // Picking a load reads that point's Z into the load panel: not while a reading question covers the values.
+    if (st.clickMode === 'setLoad' && valuesCovered(st)) return
     if (st.clickMode === 'setLoad') {
       const Z = zFromGamma(g, st.z0)
       const R = Math.round(Z.re * 100) / 100
@@ -100,7 +103,7 @@ export function StudioChart() {
     } else if (st.clickMode === 'predict' && st.prediction) {
       const m = metricsFromGamma(g, st.z0)
       const text = `clicked Γ = ${fmtC(g)} (z = ${fmtC(m.z)})`
-      st.setPrediction({ ...st.prediction, answered: text, answeredGamma: g })
+      st.setPrediction({ ...st.prediction, answered: text, answeredGamma: g, typed: false })
       st.logEvent('prediction', `Prediction answer: ${text}`)
       st.setPinned(g)
     } else {
@@ -272,8 +275,8 @@ export function StudioChart() {
       </ChartBase>
 
       {hover && hoverPx && (snap
-        ? <HoverTip g={snap.g} z0={z0} f={snap.f} px={hoverPx} on={`${snap.which === 'load' ? 'Load' : 'Input (after your network)'} at ${fmtHz(snap.f, 4)}`} />
-        : <HoverTip g={hover} z0={z0} f={d.design.f} px={hoverPx} />)}
+        ? <HoverTip g={snap.g} z0={z0} f={snap.f} px={hoverPx} covered={covered} on={`${snap.which === 'load' ? 'Load' : 'Input (after your network)'} at ${fmtHz(snap.f, 4)}`} />
+        : <HoverTip g={hover} z0={z0} f={d.design.f} px={hoverPx} covered={covered} />)}
 
       <div className="chart-legend">
         <span className="lg load">● load</span>
@@ -544,15 +547,17 @@ function labelSpot(a: Annotation): Complex | null {
 }
 
 /** What's under the cursor; `on` names the trace point it snapped to (with its frequency), if any. */
-function HoverTip({ g, z0, f, px, on }: { g: Complex; z0: number; f: number; px: { x: number; y: number }; on?: string }) {
+function HoverTip({ g, z0, f, px, on, covered }: { g: Complex; z0: number; f: number; px: { x: number; y: number }; on?: string; covered?: boolean }) {
   const m = metricsFromGamma(g, z0, f)
   return (
     <div className="hover-tip" style={{ left: px.x + 16, top: px.y + 16 }}>
       {on && <div className="tip-head">{on}</div>}
+      {covered ? <div className="muted">Values covered while you answer: use the grid and the guides.</div> : <>
       <div><b>z</b> {fmtC(m.z)} &nbsp; <b>Z</b> {fmtC(m.Z, 'Ω')}</div>
       <div><b>y</b> {fmtC(m.y)}</div>
       <div><b>|Γ|</b> {fmtNum(m.gammaMag)} ∠ {m.gammaDeg.toFixed(1)}° &nbsp; <b>VSWR</b> {fmtNum(m.vswr)}</div>
       <div><b>RL</b> {fmtDb(m.returnLossDb)} &nbsp; <b>Q</b> {fmtNum(m.q)}</div>
+      </>}
     </div>
   )
 }

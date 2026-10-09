@@ -5,6 +5,7 @@ import { FOLLOW_UP, gradeExercise, solutionFacts, type ExerciseGrade } from '@/s
 import { recordGraded, type AnswerFormat, type GradedMeta } from '@shared/memory'
 import { addSlips, patternNews, slipsFor, type SlipFinding } from '@shared/patterns'
 import type { Outcome, SkillId, Sure } from '@shared/profile'
+import type { ValuesSeen } from '@shared/reading'
 import { useApp } from '@/state/app'
 import { useTutor } from './tutor'
 
@@ -15,7 +16,7 @@ import { useTutor } from './tutor'
  */
 async function remember(
   meta: GradedMeta | undefined, outcome: Outcome, label: string,
-  how: { misconception?: string; format?: AnswerFormat; choices?: number; helped?: boolean; sure?: Sure; slips?: SlipFinding[] } = {}
+  how: { misconception?: string; format?: AnswerFormat; choices?: number; helped?: boolean; sure?: Sure; slips?: SlipFinding[]; values?: ValuesSeen } = {}
 ): Promise<string> {
   const app = useApp.getState()
   if (!meta || !app.profile) return ''
@@ -133,8 +134,9 @@ export function gradeOpenQuestion(answer: string, sure?: Sure, reason?: string):
       const format: AnswerFormat = key.type === 'move' || key.type === 'pick' ? 'mcq' : key.type === 'locate' ? 'click' : 'value' // component: a typed value
       // Guessing a two-part answer means guessing both parts.
       const choices = key.type === 'move' ? key.choices.length * (key.reasons?.choices.length ?? 1) : key.type === 'pick' ? key.choices.length : undefined
-      const report = await remember(p.graded, outcome, p.title ?? p.question, { misconception: wrongIdea, format, choices, helped: p.helped, sure, slips })
-      const how = sure ? ` (they said: ${SURE_TEXT[sure]})` : ''
+      const values: ValuesSeen | undefined = !p.values ? undefined : p.typed ? 'typed' : p.values === 'covered' && p.revealed ? 'revealed' : p.values
+      const report = await remember(p.graded, outcome, p.title ?? p.question, { misconception: wrongIdea, format, choices, helped: p.helped, sure, slips, values })
+      const how = (sure ? ` (they said: ${SURE_TEXT[sure]})` : '') + (values === 'revealed' ? ' (they uncovered the values before answering)' : '')
       await useTutor.getState().send(`[Question answered${tag}] Q: ${p.question}\nMy answer: ${said}${how}\nApp grading: ${g.detail}${report ? `\n[Learner memory] ${report}` : ''}`, {
         learnerAction: true,
         display: `My answer: ${said}${sure ? ` · ${SURE_TEXT[sure]}` : ''} — ${right ? '✓ correct' : g.status === 'partial' ? '◐ right answer, not the reason' : '✗ not quite'}`,
@@ -181,6 +183,18 @@ export function unsureQuestion(): void {
     learnerAction: true,
     display: "I'm not sure, help me reason about it"
   })
+}
+
+/**
+ * "Show values" on a covered reading question: the numbers come back, and the answer will count
+ * partly (reading.ts). The tutor hears it with their answer, not now: nothing to reply to yet.
+ */
+export function revealValues(): void {
+  const st = useStudio.getState()
+  const p = st.prediction
+  if (!p || p.values !== 'covered' || p.revealed) return
+  st.setPrediction({ ...p, revealed: true })
+  st.logEvent('prediction', 'Uncovered the values on a reading question')
 }
 
 /** Skip the question entirely; the tutor moves on. */

@@ -12,7 +12,7 @@ import { fmtEng, fmtHz } from '@/lib/format'
 import { aimFor, classifyLocate, classifyMove, classifyReach, classifyValue, inSituation, noteAsked, topicDef, type GradedMeta, type TopicId } from '@shared/memory'
 import { uid } from '@/state/studio'
 import { RUNG_COMPONENT, RUNG_SPOT, rungOfMove, rungOfReach, withRung } from '@shared/ladder'
-import { fitRung, RUNG_REASON } from '../ladderFit'
+import { fitRung, fitValues, RUNG_REASON, VALUES } from '../ladderFit'
 import { defineTools, type ToolContext } from '../types'
 import { applyScenario, ELEMENT_KINDS, SCENARIO_PROPS } from './chart'
 import { typicalValue } from './compute'
@@ -194,6 +194,7 @@ export default defineTools([
         tolerance: { type: 'number', description: 'Allowed distance in Γ (default 0.06; the chart radius is 1)' },
         title: { type: 'string', description: 'Short name for the lesson record' },
         skill: { type: 'string' },
+        ...VALUES,
         ...RUNG_REASON
       },
       required: ['question']
@@ -220,13 +221,15 @@ export default defineTools([
       graded = inSituation(graded!, `${regionOf(z)}, ${a.element ? 'after an element' : typeof a.point?.g === 'number' ? 'given as y' : 'given as z'}`)
       if (a.element) graded = withRung(graded, 1)
       const fit = fitRung(ctx, graded, a.rung_reason)
+      // A plain point is reading: the hover tip and readout would answer it, so they're covered (reading.ts).
+      const read = a.element ? null : fitValues(ctx, graded, a.values, a.rung_reason)
       const tol = Number.isFinite(a.tolerance) && a.tolerance > 0 ? Math.min(a.tolerance, 0.3) : 0.06
       const targetText = `${what} (y = ${fmtNorm(admittanceOf(z))})`
       s.setPrediction({
         id: uid('q'), question: String(a.question), kind: 'click', title: a.title ?? short(String(a.question)), skill: a.skill,
-        key: { type: 'locate', target: gammaFromZ(z, 1), tol, targetText }, graded
+        key: { type: 'locate', target: gammaFromZ(z, 1), tol, targetText }, graded, ...(read ? { values: read.values } : {})
       })
-      return `Question card shown; the learner will click on the chart. The answer is ${targetText} (don't reveal it). The app grades the click and tells you how far off it is.${remember(ctx, graded!, 'locate', String(a.question))}${fit}`
+      return `Question card shown; the learner will click on the chart. The answer is ${targetText} (don't reveal it). The app grades the click and tells you how far off it is.${remember(ctx, graded!, 'locate', String(a.question))}${fit}${read?.note ?? ''}`
     }
   },
   {
@@ -282,9 +285,11 @@ export default defineTools([
         question: { type: 'string', description: 'Written to the learner' },
         quantity: { type: 'string', enum: Object.keys(QUANTITIES) },
         ...FROM,
-        tolerance_pct: { type: 'number', description: 'Default 5; 1–20' },
+        tolerance_pct: { type: 'number', description: 'Default 8 with the values covered (read by eye from the chart), 5 with them shown; 1–20' },
         title: { type: 'string' },
-        skill: { type: 'string' }
+        skill: { type: 'string' },
+        ...VALUES,
+        ...RUNG_REASON
       },
       required: ['question', 'quantity']
     },
@@ -297,17 +302,21 @@ export default defineTools([
       const { Z, what } = startZ({ from: a.from ?? a.of, from_point: a.from_point }, ctx, s.designFreq)
       const metrics = metricsFromZ(Z, s.z0, s.designFreq)
       if (quantity === 'gamma_angle_deg' && metrics.gammaMag < 0.02) throw new Error('At the centre (matched) Γ ≈ 0, so it has no angle: ask about another point or quantity.')
+      // The load panel prints a fixed load's R and X: asking for its Z in Ω is copying, not reading.
+      if (quantity === 'Z_ohm' && s.load.kind === 'fixed' && what === 'the load') throw new Error('The load panel already shows the R and X of this load, so Z in Ω would be copied, not read. Ask for z (they normalise it), y or Y, or Z at another point (from_point or from: "input").')
       const expected = expectedValue(metrics, quantity)
       const graded = inSituation(classifyValue(quantity), `${quantity}, ${regionOf(c(Z.re / s.z0, Z.im / s.z0))}`)
       const finite = typeof expected === 'number' ? Number.isFinite(expected) : isFiniteC(expected)
       if (!finite) throw new Error(`${QUANTITIES[quantity].label} is infinite or undefined at ${what}; ask about another point or quantity.`)
-      const tolPct = Number.isFinite(a.tolerance_pct) ? Math.min(20, Math.max(1, a.tolerance_pct)) : 5
+      const read = fitValues(ctx, graded, a.values, a.rung_reason)
+      // Read by eye from the chart is less exact than copying a number: a wider default.
+      const tolPct = Number.isFinite(a.tolerance_pct) ? Math.min(20, Math.max(1, a.tolerance_pct)) : read.values === 'covered' ? 8 : 5
       s.setPrediction({
         id: uid('q'), question: String(a.question), kind: 'text', hint: QUANTITIES[quantity].hint, title: a.title ?? short(String(a.question)), skill: a.skill,
-        key: { type: 'value', quantity, expected, tolPct, z0: s.z0 }, graded
+        key: { type: 'value', quantity, expected, tolPct, z0: s.z0 }, graded, values: read.values
       })
       const shown = typeof expected === 'number' ? expected.toFixed(3) : fmtNorm(expected)
-      return `Question card shown. Exact ${QUANTITIES[quantity].label} at ${what}: ${shown} at ${fmtHz(s.designFreq)} (don't reveal it). The app grades their answer (±${tolPct}%) and tells you.${remember(ctx, graded, 'value', String(a.question))}`
+      return `Question card shown. Exact ${QUANTITIES[quantity].label} at ${what}: ${shown} at ${fmtHz(s.designFreq)} (don't reveal it). The app grades their answer (±${tolPct}%) and tells you.${remember(ctx, graded, 'value', String(a.question))}${read.note}`
     }
   },
   {

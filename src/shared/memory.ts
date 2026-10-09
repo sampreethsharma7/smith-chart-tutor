@@ -8,6 +8,7 @@
 import { ANSWER_LOG_MAX, applyEvidence, lessonsOf, SKILLS, type Misconception, type Outcome, type Profile, type SkillId, type Sure } from './profile'
 import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOff } from './signoff'
 import { ladderBrief, moveOnLadder, type Rung } from './ladder'
+import { moveReading, readingBrief, readOff, type ValuesSeen } from './reading'
 
 // ── Topics: the specific things a learner can be good or shaky at ───────────
 
@@ -234,6 +235,8 @@ export interface GradedResult {
   helped?: boolean
   /** How sure they said they were, before seeing the result */
   sure?: Sure
+  /** Reading questions: whether the values were covered while they answered (reading.ts) */
+  values?: ValuesSeen
 }
 
 /** What each answer told us about how well they judge themselves, put together. */
@@ -291,7 +294,8 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
   const { meta: m, at } = r
   // Right with help shows they can follow, not that they can do it alone; right by a guess shows
   // little: both partly right. Right but unsure: right, but fragile (weighs less, comes back soon).
-  const outcome: Outcome = r.outcome === 'correct' && (r.helped || r.sure === 'guess') ? 'partial' : r.outcome
+  // Right with the values on screen shows they can find the number, not read the chart: partly right too.
+  const outcome: Outcome = r.outcome === 'correct' && (r.helped || r.sure === 'guess' || readOff(r.values)) ? 'partial' : r.outcome
   const fragile = outcome === 'correct' && r.sure === 'unsure'
   const weight = evidenceWeight(r.format, r.choices, r.outcome) * (fragile ? 0.6 : 1)
   const before = p.skills[m.skill]
@@ -359,6 +363,9 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
   // The independence ladder (ladder.ts): how much of a task they decide themselves.
   const step = moveOnLadder(p, m, outcome, r.sure, fragile, at)
   if (step?.note) notes.push(`independence ladder: ${m.skill} ${step.note}`)
+  // Reading questions: values covered (from the chart) or on screen (reading.ts).
+  const read = r.values ? moveReading(p, m.skill, r.values, r.outcome, { sure: r.sure, helped: r.helped }, at) : null
+  if (read?.note) notes.push(`reading: ${m.skill} ${read.note}`)
 
   const profile: Profile = {
     ...p,
@@ -366,17 +373,20 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
     topics: { ...(p.topics ?? {}), [m.topic]: topic },
     ...(step ? { ladder: { ...(p.ladder ?? {}), [m.skill]: step.state } } : {}),
     ...(step?.pace !== undefined ? { ladderPace: [...(p.ladderPace ?? []), step.pace].slice(-12) } : {}),
+    ...(read ? { reading: { ...(p.reading ?? {}), [m.skill]: read.state } } : {}),
     misconceptions,
     ...(r.sure ? { calibration: [...(p.calibration ?? []), { sure: r.sure, right: r.outcome === 'correct', at, topic: m.topic }].slice(-80) } : {}),
     answers: [...(p.answers ?? []), {
       at, session: r.session, topic: m.topic, skill: m.skill, difficulty: m.difficulty, outcome: r.outcome,
       ...(r.sure ? { sure: r.sure } : {}), ...(r.helped ? { helped: true } : {}), ...(r.format ? { format: r.format } : {}), ...(m.ctx ? { ctx: m.ctx } : {}),
-      ...(m.rung ? { rung: m.rung } : {})
+      ...(m.rung ? { rung: m.rung } : {}), ...(r.values ? { values: r.values } : {})
     }].slice(-ANSWER_LOG_MAX)
   }
   const name = topicDef(m.topic)!.name
   const levelMove = topic.level > (p.topics?.[m.topic]?.level ?? startLevel(p, m.topic)) ? ' (up)' : topic.level < (p.topics?.[m.topic]?.level ?? startLevel(p, m.topic)) ? ' (down)' : ''
   if (r.outcome === 'correct' && r.helped) notes.push('counted as partly right: they had help')
+  else if (r.outcome === 'correct' && r.values === 'typed') notes.push('counted as partly right: they typed the point instead of finding it on the chart')
+  else if (r.outcome === 'correct' && readOff(r.values)) notes.push(`counted as partly right: the values were on their screen${r.values === 'revealed' ? ' (they uncovered them)' : ''}`)
   else if (weight < 1) notes.push(`a pick from ${r.choices ?? 3} choices, so it counts ${Math.round(weight * 100)}% (could be a guess)`)
   const report = `Recorded automatically (don't record_evidence for this answer): ${m.skill} ${before.mastery.toFixed(2)} → ${skill.mastery.toFixed(2)}; ${name}: ${topic.correct} of ${topic.seen} right, next aim level ${topic.level}${levelMove}, review again in ${REVIEW_DAYS[topic.box]} day(s)${notes.length ? `; ${notes.join('; ')}` : ''}.`
   return { profile, report }
@@ -494,6 +504,7 @@ export function learnerBrief(p: Profile, now: string): BriefParts {
     lines.push(`- ${s.id} ${st.mastery.toFixed(2)}${trend} · aim level ${aim}${st.evidence < 3 ? ' · little evidence yet' : ''}`)
   }
   lines.push(ladderBrief(p, now))
+  lines.push(readingBrief(p))
 
   const due = topics.filter(([, t]) => t.due <= now).sort((a, b) => a[1].box - b[1].box || a[1].due.localeCompare(b[1].due)).map(([id]) => id)
   const weak = topics.filter(([, t]) => topicState(t) === 'shaky').sort((a, b) => pct(a[1]) - pct(b[1])).map(([id]) => id)

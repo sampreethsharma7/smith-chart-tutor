@@ -5,7 +5,8 @@ import { cardPartsText, type DesignOption, type Proposal } from '@/agent/design/
 import type { NetworkElement } from '@shared/rf/network'
 import { activeProvider, useApp } from '@/state/app'
 import type { ProviderConfig } from '@shared/llm'
-import { useStudio } from '@/state/studio'
+import { useStudio, valuesCovered } from '@/state/studio'
+import { CoveredNote } from '@/panels/Readout'
 import { teachMeWhy } from '@/state/handoff'
 import { fmtHz } from '@/lib/format'
 import { Message, ResizeHandle } from './TutorPanel'
@@ -144,6 +145,7 @@ function OptionCard({ o, n, goal, fixedLoad, applied, edited, busy, canUndo }: {
   const r = o.result
   const { apply, undoApply } = useDesigner.getState()
   const bw = r.bandwidth
+  const covered = useStudio(valuesCovered)
   return (
     <div className={`design-option ${o.recommended ? 'recommended' : ''} ${applied ? 'applied' : ''}`}>
       <div className="design-option-head">
@@ -158,7 +160,7 @@ function OptionCard({ o, n, goal, fixedLoad, applied, edited, busy, canUndo }: {
       {o.recommended && <span className="chip ok recommended-chip">recommended</span>}
       {/* The parts, unless the title already lists them */}
       {!o.title.replace(/\s/g, '').includes(cardPartsText(o.elements).replace(/\s/g, '')) && <div className="small">{cardPartsText(o.elements)}</div>}
-      <div className="design-metrics small">
+      {covered ? <CoveredNote /> : <div className="design-metrics small">
         <span className="muted">At {fmtHz(goal.f0)}</span>
         <span>VSWR {vs(r.vswr)} · {r.returnLossDb > 60 ? 'RL over 60 dB' : `RL ${r.returnLossDb.toFixed(1)} dB`}</span>
         {r.band && <>
@@ -172,7 +174,7 @@ function OptionCard({ o, n, goal, fixedLoad, applied, edited, busy, canUndo }: {
             : `${fmtHz(bw.low)}–${fmtHz(bw.high)} (${(bw.fractional * 100).toFixed(1)}%)`
           : 'not at the design frequency'}</span>
         {bw && fixedLoad && <><span /><span className="muted" title="A fixed impedance is the same at every frequency, so only the network limits the bandwidth here. Import measured data or use a load model for a real answer.">network only: your load is a fixed impedance, a real one would be narrower</span></>}
-      </div>
+      </div>}
       {o.note && <div className="small">{o.note}</div>}
     </div>
   )

@@ -1,5 +1,6 @@
 import { ELEMENT_LABEL, type ElementKind, type NetworkElement } from '@shared/rf/network'
-import { useStudio } from '@/state/studio'
+import { useStudio, valuesCovered } from '@/state/studio'
+import { CoveredNote } from '@/panels/Readout'
 import { useDerived } from '@/state/derived'
 import { NumField } from '@/components/NumField'
 import { fmtC, fmtNum } from '@/lib/format'
@@ -43,6 +44,7 @@ export function NetworkPanel() {
 
   // Z after each element at the design frequency
   const nodes = d.path.map((seg) => seg[seg.length - 1])
+  const covered = useStudio(valuesCovered)
 
   return (
     <section className="panel">
@@ -90,7 +92,7 @@ export function NetworkPanel() {
               />
               <div className="muted small">
                 {isLine(el.kind) ? `${fmtNum(el.value / 360, 3)} λ at ${fmtNum((el.refHz ?? designFreq) / 1e9, 4)} GHz · ` : ''}
-                z after: {zAfter}
+                z after: {covered ? <CoveredNote inline /> : zAfter}
               </div>
             </li>
           )

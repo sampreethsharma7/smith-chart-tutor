@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { importFile, parseCstAscii, type CstColumnFormat } from '@shared/rf/importers'
 import type { LoadModel } from '@shared/rf/network'
-import { DEFAULT_SNAPSHOT, loadVariesWithFrequency, useStudio } from '@/state/studio'
+import { DEFAULT_SNAPSHOT, loadVariesWithFrequency, useStudio, valuesCovered } from '@/state/studio'
 import { api, useApp } from '@/state/app'
 import { NumField } from '@/components/NumField'
 import { fmtHz } from '@/lib/format'
@@ -23,6 +23,8 @@ export function LoadPanel() {
   const z0 = useStudio((s) => s.z0)
   const datasets = useStudio((s) => s.datasets)
   const clickMode = useStudio((s) => s.clickMode)
+  // Picking a load shows that point's Z: paused while a reading question covers the values.
+  const covered = useStudio(valuesCovered)
   const st = useStudio.getState
   const [err, setErr] = useState<string | null>(null)
 
@@ -155,7 +157,8 @@ export function LoadPanel() {
         <button
           className={clickMode === 'setLoad' ? 'active' : ''}
           onClick={() => st().setClickMode(clickMode === 'setLoad' ? 'inspect' : 'setLoad')}
-          title="Click anywhere on the chart to make that the load impedance"
+          disabled={covered}
+          title={covered ? 'Paused while a reading question is open: it would show the Z of the point you click' : 'Click anywhere on the chart to make that the load impedance'}
         >
           {clickMode === 'setLoad' ? 'Click chart… (on)' : 'Pick load on chart'}
         </button>

@@ -992,3 +992,112 @@ describe('independence ladder: the tools work out each item\'s rung and hold the
     expect(useStudio.getState().load).toMatchObject({ kind: 'fixed', R: 100, X: 0 })
   })
 })
+
+describe('reading questions: the values that would answer them are covered, and copied answers count partly', () => {
+  const AT = new Date().toISOString()
+  const reads = (skill: string, stage: 'readout' | 'chart') => {
+    app.profile = { ...app.profile, reading: { ...(app.profile.reading ?? {}), [skill]: { stage, streak: 0, misses: 0, source: 'answers', at: AT } } }
+  }
+  const covered = async () => (await import('@/state/studio')).valuesCovered(useStudio.getState())
+
+  it('a beginner sees the values (±5%), told it counts partly; nothing is covered', async () => {
+    const r = await runTool('ask_value', { question: 'What is the VSWR of the load?', quantity: 'vswr', from: 'load' }, ctx)
+    expect(r.isError).toBe(false)
+    expect(r.content).toMatch(/±5%/)
+    expect(r.content).toMatch(/Values shown: they're at the readout stage on reflection \(an estimate\), so the answer counts partly/)
+    expect(useStudio.getState().prediction?.values).toBe('shown')
+    expect(await covered()).toBe(false)
+  })
+
+  it('once they read from the chart the values are covered (±8%) and the calculator pauses, until they answer', async () => {
+    reads('reflection', 'chart')
+    const { convertLocked, networkLocked } = await import('@/state/calc')
+    const r = await runTool('ask_value', { question: 'What is the VSWR of the load?', quantity: 'vswr', from: 'load' }, ctx)
+    expect(r.content).toMatch(/±8%/)
+    expect(r.content).toMatch(/Values covered on their screen/)
+    expect(await covered()).toBe(true)
+    expect(convertLocked()).toBe(true)
+    expect(networkLocked()).toBe(true)
+    // VSWR of 30 + j20 on 50 Ω is 2.0 (|Γ| = 1/3): 2.15 is within 8%, as a chart reading would be.
+    script.push(text('Good reading.'))
+    expect(await answerNow('2.15', 'sure')).toBeNull()
+    await idle()
+    expect(await covered()).toBe(false)
+    expect(networkLocked()).toBe(false)
+    expect(app.profile.answers.at(-1)).toMatchObject({ topic: 'gamma_vswr', outcome: 'correct', values: 'covered' })
+    expect(lastUserText(requests[0])).not.toMatch(/partly right/)
+  })
+
+  it('the tutor can\'t show the values to someone who reads the chart without a reason; nothing changes on screen', async () => {
+    reads('reflection', 'chart')
+    const r = await runTool('ask_value', { question: 'VSWR?', quantity: 'vswr', from: 'load', values: 'shown' }, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/They read reflection from the chart, so the app covers the values/)
+    expect(useStudio.getState().prediction).toBeNull()
+    let session: any = { id: 'L9', rungOverrides: [] }
+    const inLesson = { ...ctx, session: () => session, updateSession: (fn: (s: any) => any) => { session = fn(session) } }
+    const ok = await runTool('ask_value', { question: 'VSWR?', quantity: 'vswr', from: 'load', values: 'shown', rung_reason: 'warm_up' }, inLesson)
+    expect(ok.isError).toBe(false)
+    expect(useStudio.getState().prediction?.values).toBe('shown')
+    expect(session.rungOverrides).toMatchObject([{ reason: 'warm_up', skill: 'reflection' }])
+  })
+
+  it('"Show values" uncovers them; the answer then counts partly, and the tutor hears why', async () => {
+    reads('reflection', 'chart')
+    const { revealValues } = await import('./answers')
+    await runTool('ask_value', { question: 'What is the VSWR of the load?', quantity: 'vswr', from: 'load' }, ctx)
+    revealValues()
+    expect(useStudio.getState().prediction).toMatchObject({ values: 'covered', revealed: true })
+    expect(await covered()).toBe(false)
+    script.push(text('OK.'))
+    await answerNow('2', 'sure')
+    await idle()
+    expect(app.profile.answers.at(-1)).toMatchObject({ outcome: 'correct', values: 'revealed' })
+    const said = lastUserText(requests[0])
+    expect(said).toMatch(/\(they uncovered the values before answering\)/)
+    expect(said).toMatch(/counted as partly right: the values were on their screen \(they uncovered them\)/)
+  })
+
+  it('click questions: a plain point is covered; where a part takes the point is a prediction, not covered', async () => {
+    reads('chart_basics', 'chart')
+    await runTool('ask_locate', { question: 'Click z = 1 + j1', point: { r: 1, x: 1 } }, ctx)
+    expect(useStudio.getState().prediction?.values).toBe('covered')
+    expect(await covered()).toBe(true)
+    await runTool('ask_locate', { question: 'Where does 2 pF of shunt C take the load?', element: { kind: 'shuntC', value: 2e-12 }, from: 'load' }, ctx)
+    expect(useStudio.getState().prediction?.values).toBeUndefined()
+    expect(await covered()).toBe(false)
+  })
+
+  it('a beginner who reads it right from the chart (a stretch) moves to the chart at once', async () => {
+    const r = await runTool('ask_value', { question: 'VSWR?', quantity: 'vswr', from: 'load', values: 'covered' }, ctx)
+    expect(r.content).toMatch(/a stretch/)
+    script.push(text('Nice.'))
+    await answerNow('2', 'sure')
+    await idle()
+    expect(app.profile.reading.reflection).toMatchObject({ stage: 'chart', provisional: false })
+    expect(lastUserText(requests[0])).toMatch(/reading: reflection read it from the chart cleanly/)
+  })
+
+  it('review fixes: Z in ohms of a fixed load is refused (the load panel prints it); the converter stays open when values are shown', async () => {
+    const r = await runTool('ask_value', { question: 'Z of the load?', quantity: 'Z_ohm', from: 'load' }, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/would be copied, not read/)
+    expect((await runTool('ask_value', { question: 'z of the load?', quantity: 'z', from: 'load' }, ctx)).isError).toBe(false)
+    const { convertLocked } = await import('@/state/calc')
+    expect(useStudio.getState().prediction?.values).toBe('shown')
+    expect(convertLocked()).toBe(false)
+  })
+
+  it('review fixes: a click question answered by typing the point counts partly and leaves the stage alone', async () => {
+    reads('chart_basics', 'chart')
+    await runTool('ask_locate', { question: 'Click z = 1 + j1', point: { r: 1, x: 1 } }, ctx)
+    const p = useStudio.getState().prediction!
+    useStudio.getState().setPrediction({ ...p, answered: 'typed z = 1 + j1', answeredGamma: gammaFromZ(c(1, 1), 1), typed: true })
+    script.push(text('OK.'))
+    await answerNow('typed z = 1 + j1', 'sure')
+    await idle()
+    expect(app.profile.answers.at(-1)).toMatchObject({ outcome: 'correct', values: 'typed' })
+    expect(app.profile.reading.chart_basics).toMatchObject({ stage: 'chart', misses: 0 })
+    expect(lastUserText(requests[0])).toMatch(/they typed the point instead of finding it on the chart/)
+  })
+})

@@ -4,7 +4,7 @@ import { useTutor, type DisplayItem } from '@/agent/tutor'
 import { useStudio } from '@/state/studio'
 import { activeProvider, useApp } from '@/state/app'
 import { exerciseGoal } from '@/state/exercise'
-import { answerQuestion, checkExercise, skipQuestion, unsureQuestion } from '@/agent/answers'
+import { answerQuestion, checkExercise, revealValues, skipQuestion, unsureQuestion } from '@/agent/answers'
 import { Markdown } from '@/components/Markdown'
 import { FlagButton } from '@/components/Flag'
 import { parseComplex } from '@shared/rf/tasks'
@@ -343,6 +343,8 @@ function PredictionCard() {
   if (!p) return null
   const graded = !!p.key
   const reasons = p.key?.type === 'move' ? p.key.reasons : undefined
+  // A reading question with the values covered (reading.ts): no typed point, no clicked value.
+  const covered = p.values === 'covered' && !p.revealed
 
   // One click answers and says how sure they are (where on the button they clicked).
   const answer = (a: string, sure?: Sure, reason?: string) => {
@@ -385,10 +387,12 @@ function PredictionCard() {
       ) : null}
       {p.kind === 'click' && (
         <div>
-          <TypedPoint onPoint={(g, z) => useStudio.getState().setPrediction({ ...p, answered: `clicked z = ${z}`, answeredGamma: g })} disabled={busy} />
+          {/* Always there for keyboard users; on a reading question a typed point counts partly (it copies the question's z). */}
+          <TypedPoint onPoint={(g, z) => useStudio.getState().setPrediction({ ...p, answered: `typed z = ${z}`, answeredGamma: g, typed: true })} disabled={busy} />
+          {p.values && <span className="muted small">Typing the point counts partly; finding it on the chart counts fully.</span>}
           {p.answered ? (
             <div className="col">
-              <span className="small">{p.answered}</span>
+              <span className="small">{covered && !p.typed ? 'Point chosen (marked on the chart); its value shows after you submit.' : p.answered}</span>
               {graded && <SureKey />}
               {graded
                 ? <SureButton className="primary wide" onPick={(sure) => answer(p.answered!, sure)} disabled={busy}>Submit</SureButton>
@@ -415,6 +419,14 @@ function PredictionCard() {
         </div>
       )}
       {err && <div className="grade fail">{err}</div>}
+      {covered && (
+        <div className="covered-note">
+          The values are covered: read this from the chart.{' '}
+          <button className="link small" onClick={revealValues} disabled={busy} title="Uncover the readout, hover values and tables. Your answer then counts as partly right, since the number was on screen.">Show values</button>
+        </div>
+      )}
+      {p.values === 'covered' && p.revealed && <div className="muted small">Values shown: this answer counts as partly right.</div>}
+      {p.values === 'shown' && <div className="muted small">The values are on screen for this one, so it counts as partly right. Soon you'll read them from the chart.</div>}
       <div className="row">
         <button className="link" onClick={unsureQuestion} disabled={busy}>{graded ? 'Help me think it through' : "I'm not sure"}</button>
         {graded && <button className="link" onClick={skipQuestion} disabled={busy}>Skip this question</button>}

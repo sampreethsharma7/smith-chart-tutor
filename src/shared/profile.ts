@@ -4,6 +4,7 @@ import type { AskedItem, Note, TopicId, TopicStat } from './memory'
 import type { Slip } from './patterns'
 import type { Observation } from './signoff'
 import { rebuildLadder, type LadderState, type Rung } from './ladder'
+import type { ReadingState, ValuesSeen } from './reading'
 
 export type SkillId =
   | 'chart_basics'
@@ -218,6 +219,8 @@ export interface Profile {
   ladder?: Partial<Record<SkillId, LadderState>>
   /** How many answers their past climbs up the ladder took, newest last: their pace, on any skill */
   ladderPace?: number[]
+  /** Per skill: whether reading questions show the values or cover them (reading.ts) */
+  reading?: Partial<Record<SkillId, ReadingState>>
 }
 
 export interface NextFocus {
@@ -341,6 +344,8 @@ export interface AnswerRecord {
   ctx?: string
   /** Its rung on the independence ladder (ladder.ts); absent before the ladder and for reading items */
   rung?: Rung
+  /** Reading questions: whether the values were covered, shown, or uncovered by them (reading.ts) */
+  values?: ValuesSeen
 }
 
 export const ANSWER_LOG_MAX = 1000
