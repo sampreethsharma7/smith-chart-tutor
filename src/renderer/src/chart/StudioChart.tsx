@@ -122,10 +122,13 @@ export function StudioChart() {
   }
 
   // Every named point on the chart; labels are laid out together below.
-  const points: Array<{ g: Complex; cls: string; label: string; big?: boolean }> = []
+  const points: ChartPoint[] = []
+  // With a network, the input trace's markers carry the names (that's where the match is judged);
+  // the load's copies stay as plain dots, named on hover, so each marker is labelled once.
+  const inputNamed = network.length > 0 && showInputTrace
   markers.forEach((m, i) => {
-    if (showLoadTrace) points.push({ g: m.load.gamma, cls: 'marker load', label: `M${i + 1}` })
-    if (network.length > 0 && showInputTrace) points.push({ g: m.input.gamma, cls: 'marker input', label: `M${i + 1}` })
+    if (showLoadTrace) points.push({ g: m.load.gamma, cls: 'marker load', label: `M${i + 1}`, ...(inputNamed ? { unlabelled: true } : {}), tip: `M${i + 1}: the load at ${fmtHz(m.f)}` })
+    if (inputNamed) points.push({ g: m.input.gamma, cls: 'marker input', label: `M${i + 1}`, tip: `M${i + 1}: the input after your network, at ${fmtHz(m.f)}` })
   })
   points.push({ g: d.design.load.gamma, cls: 'design load', label: 'L', big: true })
   if (network.length > 0) points.push({ g: d.design.input.gamma, cls: 'design input', label: 'IN', big: true })
@@ -229,7 +232,7 @@ export function StudioChart() {
             )
           })}
 
-        {shown.map((p, i) => <Dot key={i} g={p.g} cls={p.cls} big={p.big} />)}
+        {shown.map((p, i) => <Dot key={i} g={p.g} cls={p.cls} big={p.big} tip={p.tip} />)}
         {snap && <circle cx={sx(snap.g)} cy={sy(snap.g)} r={0.014 * s} className={`trace-snap ${snap.which}`} />}
 
         {target && <TargetShape t={target} />}
@@ -323,11 +326,14 @@ function lastRun(seg: Complex[]): Pt[] {
   return out
 }
 
-function Dot({ g, cls, big }: { g: Complex; cls: string; big?: boolean }) {
+/** A named point on the chart. `unlabelled`: drawn and named on hover, but no label on the chart. */
+interface ChartPoint { g: Complex; cls: string; label: string; big?: boolean; unlabelled?: boolean; tip?: string }
+
+function Dot({ g, cls, big, tip }: { g: Complex; cls: string; big?: boolean; tip?: string }) {
   const s = useChartScale()
   return (
     <g className={`dot ${cls}`}>
-      <circle cx={sx(g)} cy={sy(g)} r={(big ? 0.02 : 0.013) * s} />
+      <circle cx={sx(g)} cy={sy(g)} r={(big ? 0.02 : 0.013) * s}>{tip && <title>{tip}</title>}</circle>
     </g>
   )
 }
@@ -344,7 +350,7 @@ function ChartLabels({ s, view, avoid, points, meanings, fixedLoad, annotations,
   fixedLoad: boolean
   /** Other text already on the chart (zoomed scale labels) */
   avoid: Box[]
-  points: Array<{ g: Complex; cls: string; label: string; big?: boolean }>
+  points: ChartPoint[]
   annotations: Annotation[]
   pathLabels: Array<{ at?: Complex; text: string; color: string }>
   traceLabels: Array<{ at: Complex; text: string }>
@@ -363,13 +369,14 @@ function ChartLabels({ s, view, avoid, points, meanings, fixedLoad, annotations,
 
   const reqs: LabelRequest[] = []
   // Design points (L, IN) name a shared spot first: "L · M1 · M2".
-  const ordered = [...points].sort((a, b) => Number(!!b.big) - Number(!!a.big))
-  const groups = mergeCoincident(ordered.map((p) => ({ x: sx(p.g), y: sy(p.g), label: p.label, cls: p.cls })), 0.02 * s)
+  // Points close together share one label ("L · M1 · M2") rather than crowding each other out.
+  const ordered = [...points].filter((p) => !p.unlabelled).sort((a, b) => Number(!!b.big) - Number(!!a.big))
+  const groups = mergeCoincident(ordered.map((p) => ({ x: sx(p.g), y: sy(p.g), label: p.label, cls: p.cls })), 0.045 * s)
   groups.forEach((g, i) => {
     const what = g.labels.map((l) => `${l} = ${meanings[l] ?? l}`).join('\n')
     const why = g.labels.length < 2 ? '' : fixedLoad && g.labels.includes('L')
       ? '\n\nThey share one spot because the load is a fixed impedance: it is the same at every frequency. Add a network and the matched points separate (L and C change with frequency).'
-      : '\n\nThese points happen to coincide.'
+      : '\n\nThese points are close together on the chart.'
     reqs.push({ id: `pt${i}`, text: g.labels.join(' · '), x: g.x, y: g.y, size: 0.032 * s, className: 'lbl dot-lbl', title: what + why })
   })
   for (const a of annotations) {
