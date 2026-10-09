@@ -623,6 +623,30 @@ describe('questions that dig: why, spot the mistake, situations, check yourself'
     expect(useStudio.getState().exercise!.graded!.ctx).toBe('upper half, r < 1 → a g circle')
   })
 
+  it('reaching the goal keeps the lesson open to read back; the learner finishes it or keeps going (flagged)', async () => {
+    const { buildSystemPrompt } = await import('./prompt')
+    useTutor.setState({ learnerTurns: 4 })
+    await useTutor.getState().send('Hi')
+    const id = useTutor.getState().session!.id
+    app.profile = { ...app.profile, nextFocus: { picks: [], at: 'x', session: id } }
+    script.push(call('complete_lesson', { can_now_do: ['Match a load'] }), text('Well done: you matched it and explained why.'))
+    await useTutor.getState().send('I matched it, and the shunt C moved it onto g = 1.')
+    // Still open, with the conversation on screen: nothing was summarised or cleared.
+    const s = useTutor.getState().session!
+    expect(s.goalReachedAt).toBeTruthy()
+    expect(useTutor.getState().history.length).toBeGreaterThan(0)
+    expect(useTutor.getState().lastEnded).toBeNull()
+    expect(buildSystemPrompt(app.profile, s).dynamic).toMatch(/GOAL REACHED: you gave the recap/)
+    // Keep going: the tutor follows their lead and doesn't close it again.
+    useTutor.getState().keepGoing()
+    expect(buildSystemPrompt(app.profile, useTutor.getState().session).dynamic).toMatch(/chose to keep going/)
+    expect((await runTool('complete_lesson', { can_now_do: ['x'] }, ctx)).content).toMatch(/already marked reached/)
+    // Finishing it later still counts the goal as reached.
+    script.push(text('Summary.'))
+    await useTutor.getState().endSession()
+    expect(useTutor.getState().lastEnded?.outcome).toBe('completed')
+  })
+
   it("a new lesson starts without the last lesson's drawings or zoom", async () => {
     useStudio.getState().setAnnotations(() => [{ id: 'old', kind: 'point', gamma: { re: 0, im: 0 }, label: 'after series C' }])
     useStudio.getState().setView({ cx: 0.2, cy: 0, half: 0.3 }, 'tutor', 'old zoom')

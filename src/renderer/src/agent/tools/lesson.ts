@@ -85,7 +85,7 @@ export default defineTools([
   },
   {
     name: 'complete_lesson',
-    description: 'The lesson goal is reached: close the lesson. In the same reply, congratulate the learner specifically and recap. The app then saves the lesson and shows them what changed in their skills. Only the goal being reached by the learner counts, not you explaining it.',
+    description: 'The lesson goal is reached. In the same reply, congratulate the learner specifically and recap. The learner then sees Finish lesson (saves it and shows how their skills moved) or Keep going. Only the goal being reached by the learner counts, not you explaining it.',
     parameters: {
       type: 'object',
       properties: {
@@ -98,6 +98,7 @@ export default defineTools([
     endsTurn: true,
     run(a, ctx) {
       const s = ctx.session()
+      if (s?.goalReachedAt) return 'The goal is already marked reached; the learner finishes the lesson when they want. Carry on with what they asked.'
       if (!s || !countsAsLesson(s) || ctx.learnerTurns() < 2) {
         throw new Error('The learner has barely started. Keep teaching toward the goal; complete the lesson only when they have reached it.')
       }
@@ -122,7 +123,7 @@ export default defineTools([
         recap: { canNowDo, practiseNext: a.practise_next ? String(a.practise_next) : undefined }
       }))
       ctx.completeLesson()
-      return 'Lesson marked complete. Now write your short recap to the learner; the app saves the lesson after your reply and shows their progress.'
+      return 'Goal marked reached. Now write your short recap to the learner. After your reply they can finish the lesson (it is saved and their progress shown) or keep going.'
     }
   }
 ])

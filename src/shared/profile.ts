@@ -77,6 +77,10 @@ export interface SessionRecord {
   provider?: string
   /** What the learner chose to work on (absent = tutor's pick; probe = a "check yourself" session) */
   focus?: LessonFocus
+  /** The tutor marked the goal reached; the lesson stays open until the learner finishes it */
+  goalReachedAt?: string
+  /** After the goal, the learner chose to keep going in the same lesson */
+  keptGoing?: boolean
   /** The tutor's goal for the lesson and the steps to it; `step` = index of the current step */
   plan?: {
     goal: string

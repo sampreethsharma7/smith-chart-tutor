@@ -118,6 +118,8 @@ interface TutorState {
   /** `design`: the learner came from the Design tab to understand that design (it's on the chart) */
   startSession(focus?: LessonFocus, design?: string): Promise<void>
   endSession(): Promise<void>
+  /** After the goal: carry on in the same lesson (the "goal reached" bar goes away) */
+  keepGoing(): void
   reset(): void
 }
 
@@ -666,8 +668,16 @@ export const useTutor = create<TutorState>((set, get) => {
         persistSession().catch(console.error)
         maybeDigest().catch(console.error)
       }
-      // The tutor reached the lesson goal and has given its recap: wrap the lesson up.
-      if (get().completing) await get().endSession()
+      // The tutor reached the goal and gave its recap. The lesson stays open so the learner can read
+      // it back; they finish it (or keep going) from the "goal reached" bar.
+      if (get().completing) {
+        set({ completing: false })
+        const s = get().session
+        if (s) {
+          set({ session: { ...s, goalReachedAt: new Date().toISOString(), keptGoing: false } })
+          persistSession().catch(console.error)
+        }
+      }
     },
 
     logExercise(ex, passed) {
@@ -708,7 +718,7 @@ export const useTutor = create<TutorState>((set, get) => {
       if (ex && ex.attempts > 0) get().logExercise(ex, ex.status === 'passed')
       const provider = activeProvider()
       const s = get().session
-      const completed = get().completing
+      const completed = get().completing || !!s?.goalReachedAt
       if (!s || !countsAsLesson(s)) {
         // Opened but never taken part in: nothing to learn from, so it isn't saved or counted.
         useStudio.getState().setExercise(null)
@@ -746,6 +756,13 @@ export const useTutor = create<TutorState>((set, get) => {
       useStudio.getState().setExercise(null)
       get().reset()
       set({ lastEnded: ended })
+    },
+
+    keepGoing() {
+      const s = get().session
+      if (!s?.goalReachedAt) return
+      set({ session: { ...s, keptGoing: true } })
+      persistSession().catch(console.error)
     },
 
     reset() {

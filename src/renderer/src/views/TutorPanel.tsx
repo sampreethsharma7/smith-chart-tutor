@@ -72,6 +72,7 @@ export function TutorPanel() {
 
       <ExerciseCard />
       <PredictionCard />
+      <GoalReachedBar />
 
       <div className="composer">
         <textarea
@@ -114,8 +115,28 @@ export const Message = memo(function Message({ it, agent = 'tutor' }: { it: Disp
   )
 })
 
+/** The goal is reached: the lesson stays open to read back until they finish it, or keep going. */
+function GoalReachedBar() {
+  const s = useTutor((t) => t.session)
+  const busy = useTutor((t) => t.busy)
+  if (!s?.goalReachedAt || s.keptGoing) return null
+  return (
+    <div className="card goal-reached">
+      <div className="row wrap">
+        <b>🎉 Goal reached</b>
+        <span className="muted small">Read back over the lesson as long as you like.</span>
+      </div>
+      <div className="row">
+        <button onClick={() => useTutor.getState().keepGoing()} disabled={busy} title="Stay in this lesson: more practice, a harder one, or questions">Keep going</button>
+        <span className="spacer" />
+        <button className="primary" onClick={() => useTutor.getState().endSession()} disabled={busy} title="Write the summary, save the lesson and see how your skills moved">Finish lesson</button>
+      </div>
+    </div>
+  )
+}
+
 /**
- * Lessons normally end themselves when the goal is reached. This lets the
+ * A lesson ends when the learner finishes it (after the goal, or early). This lets the
  * learner leave early: saved as partly done if they took part, dropped if not.
  * Closing the app only pauses a lesson.
  */

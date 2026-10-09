@@ -42,7 +42,7 @@ Everything leads to a **lesson** with the tutor. Until your first one, a *Get st
 4. **Learn**: press **▶ Start lesson**. Pick the tutor's suggestion, a skill, or your own question. The tutor sets a goal with 2–4 steps, which you see as a checklist above the chat, and starts step 1 straight away. It ticks off each step once *you* have done it.
 
 **How a lesson ends:**
-- **When you reach the goal,** the tutor closes the lesson itself. It's saved, and you see what you can now do, how your skill estimates moved, and what to practise next.
+- **When you reach the goal,** the tutor gives a recap and a **Goal reached** bar appears. The lesson stays open, so you can read back over it. **Finish lesson** saves it and shows what you can now do, how your skill estimates moved, and what to practise next. **Keep going** carries on in the same lesson (more practice, a harder one, questions); finish it whenever you like, and it still counts as reaching the goal.
 - **Finish early** saves it as *partly done*. The next lesson picks up from there.
 - **Leave** appears if you haven't answered anything yet. That lesson isn't saved or counted.
 - **Closing the app** only pauses a lesson.
@@ -322,7 +322,7 @@ Everything saves automatically, per profile, and survives tab switches, profile 
 | Faults the app noticed | as they happen | `issues.jsonl` |
 | Session transcript and exercises | after every turn | `profiles/<id>.json` |
 
-Ending a lesson (by reaching the goal or finishing early) writes a summary for the tutor's memory. Lessons you never ended are summarised automatically when you next start one.
+Finishing a lesson (after the goal or early) writes a summary for the tutor's memory. Lessons you never ended are summarised automatically when you next start one.
 
 **Long lessons.** The tutor model sees the last 60 messages. As older ones fall out of view, the app folds them into running notes for the lesson ("Learner told me: …", what was taught, what you asked and got wrong). The notes are written in the background after a turn, oldest first, and keep every fact you gave about yourself or your project. The tutor gets them on every turn, and the end-of-lesson summary is built from them, so the start of a three-hour lesson isn't forgotten. Other limits that keep a long lesson fast:
 - The chat panel draws the latest 150 messages; *Show earlier messages* adds more.

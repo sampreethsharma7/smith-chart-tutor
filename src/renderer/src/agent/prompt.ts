@@ -128,7 +128,9 @@ ${plan
   ? `Goal: ${plan.goal}\n${plan.steps.map((s, i) => `${i < plan.step ? '[done]' : i === plan.step ? '[current]' : '[ ]'} ${i + 1}. ${s}`).join('\n')}${plan.step >= plan.steps.length ? '\nAll steps done: if the goal is reached, call complete_lesson.' : ''}
 ${coordinatesLine(plan)}`
   : 'No goal set yet: call set_lesson_goal once you know what this lesson is for.'}
-${session?.digest ? `Earlier in this lesson (your running notes; those messages are no longer in your context, so rely on these and don't contradict them): ${session.digest.text}\n` : ''}Sign convention: ${CONVENTION}
+${session?.goalReachedAt ? `${session.keptGoing
+    ? 'GOAL REACHED earlier in this lesson; the learner chose to keep going. Follow their lead (more practice, a harder one, questions). Don\'t call complete_lesson again; they finish the lesson themselves.'
+    : 'GOAL REACHED: you gave the recap and the learner sees Finish lesson / Keep going. They may be reading back. Answer what they ask; don\'t start new material unless they ask for it.'}\n` : ''}${session?.digest ? `Earlier in this lesson (your running notes; those messages are no longer in your context, so rely on these and don't contradict them): ${session.digest.text}\n` : ''}Sign convention: ${CONVENTION}
 ${models.length > 1 ? `Tutor models in this lesson: ${models.join(' → ')}. You are continuing a lesson another model started: keep to the goal, step and coordinates above, and check (what_if) before contradicting or building on an earlier explanation of a move.` : ''}
 
 ## Chart right now
