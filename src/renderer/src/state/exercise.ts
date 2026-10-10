@@ -2,6 +2,8 @@ import { c, type Complex } from '@shared/rf/complex'
 import { metricsFromZ } from '@shared/rf/metrics'
 import { applyElement, ELEMENT_LABEL, inputImpedance, loadImpedance, sweepFreqs, type NetworkElement } from '@shared/rf/network'
 import { describeMove } from '@shared/rf/moves'
+import { matchCandidates } from '@shared/rf/design'
+import { partValuesOf } from '@shared/rf/giveaway'
 import { describeTarget, measureFor, targetError, type Target } from '@shared/rf/tasks'
 import { fmtHz, fmtNum } from '@/lib/format'
 import { elementValueText, useStudio, type Exercise } from './studio'
@@ -85,6 +87,23 @@ export function onProjectLoad(ex: Exercise): boolean {
     const a = loadImpedance(s.load, f, s.datasets), b = loadImpedance(p.load, f, s.datasets)
     return Math.hypot(a.re - b.re, a.im - b.im) <= 0.01 * Math.max(1e-9, Math.hypot(b.re, b.im))
   })
+}
+
+/**
+ * While their project's final task is open (not yet passed): the part values of its standard solutions
+ * (every L-match and the shortest stub matches, with the parts the task allows), so the tutor can be
+ * kept from handing them over (giveaway.ts). Empty when no final task is open.
+ */
+export function finalTaskRefs(): Array<{ value: number; unit: 'H' | 'F' | 'deg' }> {
+  const s = useStudio.getState()
+  const ex = s.exercise
+  if (!ex?.capstone || ex.status !== 'active') return []
+  const ZL = loadImpedance(ex.capstone.load.kind === 'data' && ex.capstone.datasetName
+    ? { kind: 'data', datasetId: s.datasets.find((d) => d.name === ex.capstone!.datasetName)?.id ?? '' }
+    : ex.capstone.load, ex.freqHz, s.datasets)
+  if (!Number.isFinite(ZL.re) || !Number.isFinite(ZL.im)) return []
+  const allowed = (n: NetworkElement[]) => !ex.allowedKinds?.length || n.every((e) => ex.allowedKinds!.includes(e.kind))
+  return matchCandidates(ZL, ex.capstone.z0, ex.freqHz).filter((c) => allowed(c.elements)).flatMap((c) => partValuesOf(c.elements))
 }
 
 /** Put the project's load and Z0 back on the chart (its data by name, if it was imported again). */

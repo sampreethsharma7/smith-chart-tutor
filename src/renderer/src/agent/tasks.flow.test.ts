@@ -1546,3 +1546,58 @@ describe('fixes from the novice re-run (Riya, Sonnet 5.5)', () => {
     expect((await runTool('create_exercise', { title: 'Two-part match', instructions: 'Match it with two parts.', freq_hz: F, max_vswr: 1.5, max_elements: 2, scenario: { load: { kind: 'fixed', R: 100, X: -75 } } }, ctx)).isError).toBe(false)
   })
 })
+
+describe('the project\'s final task is the learner\'s own work: its part values aren\'t handed over', () => {
+  const AT = new Date().toISOString()
+  const ANTENNA = { kind: 'antenna', topology: 'series', f0_hz: F, R: 15, Q: 6 }
+  const openFinalTask = async () => {
+    const r = (rung: number) => ({ rung, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT })
+    const c = { stage: 'chart', streak: 0, misses: 0, source: 'answers', at: AT }
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    app.profile = { ...app.profile, ladder: { lumped_moves: r(2), l_match: r(3) }, reading: { chart_basics: c, reflection: c, admittance: c } }
+    await runTool('create_exercise', { title: 'Project', instructions: 'Match it.', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
+    const { finalTaskRefs } = await import('@/state/exercise')
+    const L = finalTaskRefs().find((x) => x.unit === 'H')!
+    return `${(L.value / 1e-9).toFixed(2)} nH`
+  }
+
+  it('a reply naming a solution value is withdrawn and rewritten as a hint (the re-run listed the whole recipe)', async () => {
+    const value = await openFinalTask()
+    script.push(text(`Build it like this: 1. A series L of ${value}. 2. Then a shunt C.`), text('Think about which circle you need to reach first, then which part gets you there.'))
+    await useTutor.getState().send('how do I do it?')
+    await idle()
+    const shown = useTutor.getState().items.filter((i) => i.kind === 'tutor').map((i) => i.text)
+    expect(shown.join('\n')).not.toContain(value)
+    expect(shown.at(-1)).toMatch(/which circle you need to reach first/)
+    expect(lastUserText(requests.at(-1)!)).toMatch(/final task is open, and your reply names a part value of its solution \(.*nH\)/)
+  })
+
+  it('a card whose text names one is refused; after the task is passed, values are fine again', async () => {
+    const value = await openFinalTask()
+    const r = await runTool('ask_value', { question: 'x', quantity: 'vswr', from: 'load' }, ctx)
+    expect(r.isError).toBe(false) // cards without values are fine
+    useStudio.getState().setPrediction(null)
+    script.push(call('ask_move', { element: { kind: 'seriesL', value: 2.3e-9 }, from: 'load', question: `Starting at your antenna, a series inductor of ${value} is added. How does it move?` }), text('Okay.'))
+    await useTutor.getState().send('next?')
+    await idle()
+    expect(useStudio.getState().prediction).toBeNull()
+    const results = requests.at(-1)!.messages.flatMap((m) => m.parts).filter((p) => p.type === 'tool_result') as Array<{ content: string; isError?: boolean }>
+    expect(results.at(-1)).toMatchObject({ isError: true })
+    expect(results.at(-1)!.content).toMatch(/^Not shown\. Their project's final task is open/)
+    // Passed: talking about the solution's values is the follow-up now.
+    useStudio.getState().setExercise({ ...useStudio.getState().exercise!, status: 'passed' })
+    script.push(text(`Your solution used about ${value}: why that much?`))
+    await useTutor.getState().send('done!')
+    await idle()
+    expect(useTutor.getState().items.filter((i) => i.kind === 'tutor').at(-1)?.text).toContain(value)
+  })
+
+  it('their own value on the chart can be talked about', async () => {
+    const value = await openFinalTask()
+    useStudio.getState().addElement('seriesL', Number(value.split(' ')[0]) * 1e-9)
+    script.push(text(`Your ${value} took the point onto g = 1. Now the second part.`))
+    await useTutor.getState().send('I added the L')
+    await idle()
+    expect(useTutor.getState().items.filter((i) => i.kind === 'tutor').at(-1)?.text).toContain(value)
+  })
+})

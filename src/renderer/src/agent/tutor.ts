@@ -13,6 +13,11 @@ import { inferFromStepText, migrateLessonState } from '@shared/lesson'
 import { endsTurn, runTool, toolActivity, toolSpecs, TOOLS } from './registry'
 import { TurnAudit } from './issueLog'
 import type { ToolContext } from './types'
+import { giveaways, giveawayNudge, partValuesOf } from '@shared/rf/giveaway'
+import { finalTaskRefs } from '@/state/exercise'
+
+/** Every string inside a tool call's arguments (the text a card or drawing would show). */
+const textsOf = (v: unknown): string[] => (typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(textsOf) : v && typeof v === 'object' ? Object.values(v).flatMap(textsOf) : [])
 
 export interface DisplayItem {
   id: string
@@ -465,6 +470,7 @@ export const useTutor = create<TutorState>((set, get) => {
     let coordsNudges = 0
     let followNudged = false
     let directionFixes = 0
+    let giveawayFixes = 0
     let metaFixes = 0
     const callCounts = new Map<string, number>()
     const seenCalls = new Map<string, string>() // name+args → result, for identical repeats
@@ -525,16 +531,20 @@ export const useTutor = create<TutorState>((set, get) => {
       // After a card, tool calls are dropped, so a nudge asking for what_if couldn't be met.
       const needCoords = claims && coordsUnknown && coordsNudges < 2 && !finalStep
       const needVerify = claims && !verified && !verifyNudged && !finalStep
-      if (needFix || needCoords || needVerify) {
-        if (needFix) directionFixes++
+      // Their project's final task is their own work: its solution's part values aren't handed over (giveaway.ts).
+      const leaked = giveaways(text, finalTaskRefs(), partValuesOf(useStudio.getState().network))
+      const needWithhold = leaked.length > 0 && giveawayFixes < 2
+      if (needWithhold || needFix || needCoords || needVerify) {
+        if (needWithhold) giveawayFixes++
+        else if (needFix) directionFixes++
         if (needCoords) coordsNudges++
         if (needVerify) verifyNudged = true
-        audit.event('guard', needFix ? `wrong direction rewritten (${wrongDirections.map((e) => e.fix).join('; ').slice(0, 120)})` : needCoords ? 'move described with coordinates unknown' : 'move described without checking it (what_if)')
+        audit.event('guard', needWithhold ? `final-task part value withheld (${leaked.join(', ')})` : needFix ? `wrong direction rewritten (${wrongDirections.map((e) => e.fix).join('; ').slice(0, 120)})` : needCoords ? 'move described with coordinates unknown' : 'move described without checking it (what_if)')
         removeItem(itemId)
-        pushItem({ kind: 'tool', text: 'Double-checking that on the chart…' })
+        if (!needWithhold) pushItem({ kind: 'tool', text: 'Double-checking that on the chart…' })
         const h = get().history
         const last = h[h.length - 1]
-        const nudgeText = needFix ? directionNudge(wrongDirections) : needCoords ? `${COORDINATES_NUDGE}\n${VERIFY_NUDGE}` : VERIFY_NUDGE
+        const nudgeText = needWithhold ? giveawayNudge(leaked) : needFix ? directionNudge(wrongDirections) : needCoords ? `${COORDINATES_NUDGE}\n${VERIFY_NUDGE}` : VERIFY_NUDGE
         const nudge: Part = { type: 'text', text: nudgeText }
         // Keep user/assistant turns alternating: add to the last user turn if there is one.
         set({ history: last?.role === 'user' ? [...h.slice(0, -1), { ...last, parts: [...last.parts, nudge] }] : [...h, { role: 'user', parts: [nudge] }] })
@@ -594,11 +604,15 @@ export const useTutor = create<TutorState>((set, get) => {
         callCounts.set(call.name, n)
         const toolItem = pushItem({ kind: 'tool', text: toolActivity(call.name, call.args) + '…' })
         // One card per turn: refused once a turn-ending tool has succeeded (a failed attempt may be retried).
+        // A card or drawing whose text hands over a part value of their final task is refused like a reply would be.
+        const cardLeak = giveaways(textsOf(call.args).join('\n'), finalTaskRefs(), partValuesOf(useStudio.getState().network))
         const r = endsTurn(call.name) && finalStep
           ? { content: `Already done this turn. Do not call ${call.name} again; reply to the learner and wait.`, isError: true }
           : n > 4
             ? { content: `You have called ${call.name} ${n} times this turn. Stop calling tools and reply to the learner.`, isError: true }
-            : await runTool(call.name, call.args, ctx)
+            : cardLeak.length
+              ? { content: `Not shown. ${giveawayNudge(cardLeak).replace(/^\[System\] /, '')}`, isError: true }
+              : await runTool(call.name, call.args, ctx)
         patchItem(toolItem, (i) => ({ ...i, text: toolActivity(call.name, call.args) + (r.isError ? ' (skipped)' : '') }))
         if (r.isError && /Already done|times this turn/.test(r.content)) removeItem(toolItem)
         results.push({ type: 'tool_result', callId: call.id, name: call.name, content: r.content, isError: r.isError })
