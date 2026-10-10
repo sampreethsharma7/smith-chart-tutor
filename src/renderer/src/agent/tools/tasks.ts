@@ -2,7 +2,7 @@ import { c, isFiniteC, type Complex } from '@shared/rf/complex'
 import { gammaFromZ, metricsFromZ } from '@shared/rf/metrics'
 import { applyElement, ELEMENT_LABEL, inputImpedance, loadImpedance, type ElementKind, type NetworkElement } from '@shared/rf/network'
 import {
-  admittanceOf, DEFAULT_TASK_KINDS, describeTarget, expectedValue, findReach, fmtNorm, moveQuestion, parseTarget, pointNamedIn,
+  admittanceOf, DEFAULT_TASK_KINDS, describeTarget, expectedValue, findReach, fmtNorm, moveQuestion, ohmsIn, parseTarget, pointNamedIn,
   QUANTITIES, regionOf, type Quantity
 } from '@shared/rf/tasks'
 import { MISTAKES, spotQuestion, type Mistake } from '@shared/rf/spot'
@@ -21,6 +21,21 @@ import { typicalValue } from './compute'
  * Graded tasks and questions beyond matching. The tutor designs them; the app
  * computes the right answer, checks the task is possible, and grades exactly.
  */
+
+/** A question that asks for an estimate by eye */
+export const ESTIMATE = /\b(estimate|estimating|roughly|by eye|approximately|approximate|eyeball|ballpark)\b|\babout (what|how)\b/i
+
+/** The question states the point (Z in Ω, or z or y = …) that the answer is asked at, within 2%. */
+export function statesPoint(question: string, Z: Complex, z0: number): boolean {
+  const zn = c(Z.re / z0, Z.im / z0)
+  const named = pointNamedIn(question)
+  const zs = [
+    ...ohmsIn(question).map((v) => c(v.re / z0, v.im / z0)),
+    ...(named?.via === 'z' ? named.values : []),
+    ...(named?.via === 'y' ? named.values.map(admittanceOf) : [])
+  ]
+  return zs.some((v) => Math.hypot(v.re - zn.re, v.im - zn.im) <= 0.02 * Math.max(0.05, Math.hypot(zn.re, zn.im)))
+}
 
 const POINT = {
   type: 'object',
@@ -323,12 +338,20 @@ export default defineTools([
       const graded = inSituation(classifyValue(quantity), `${quantity}, ${regionOf(c(Z.re / s.z0, Z.im / s.z0))}`)
       const finite = typeof expected === 'number' ? Number.isFinite(expected) : isFiniteC(expected)
       if (!finite) throw new Error(`${QUANTITIES[quantity].label} is infinite or undefined at ${what}; ask about another point or quantity.`)
-      const read = fitValues(ctx, graded, a.values, a.rung_reason)
-      // Read by eye from the chart is less exact than copying a number: a wider default.
-      const tolPct = Number.isFinite(a.tolerance_pct) ? Math.min(20, Math.max(1, a.tolerance_pct)) : read.values === 'covered' ? 8 : 5
+      // A z, y, Z or Y whose point the question itself states ("your load is 100 + j50 Ω… what is z?") is
+      // worked out, not read off the chart: not a reading question, so nothing is covered and it doesn't
+      // move their reading stage (a novice re-run counted such a division as reading from the chart).
+      const stated = QUANTITIES[quantity].complex && statesPoint(String(a.question), Z, s.z0)
+      const read = stated
+        ? { values: undefined, note: ' The question states this point, so the answer is worked out, not read off the chart: it counts as working, not as reading (nothing is covered).' }
+        : fitValues(ctx, graded, a.values, a.rung_reason)
+      // Read by eye from the chart is less exact than copying a number: a wider default. So is any answer the
+      // question asks them to estimate, values shown or not (a novice re-run marked a good by-eye 0.3 for 0.277 wrong).
+      const estimate = ESTIMATE.test(String(a.question))
+      const tolPct = Number.isFinite(a.tolerance_pct) ? Math.min(20, Math.max(1, a.tolerance_pct)) : read.values === 'covered' || estimate ? 8 : 5
       s.setPrediction({
         id: uid('q'), question: String(a.question), kind: 'text', hint: QUANTITIES[quantity].hint, title: a.title ?? short(String(a.question)), skill: a.skill,
-        key: { type: 'value', quantity, expected, tolPct, z0: s.z0 }, graded, values: read.values
+        key: { type: 'value', quantity, expected, tolPct, z0: s.z0, ...(estimate ? { estimate } : {}) }, graded, values: read.values
       })
       const shown = typeof expected === 'number' ? expected.toFixed(3) : fmtNorm(expected)
       return `Question card shown. Exact ${QUANTITIES[quantity].label} at ${what}: ${shown} at ${fmtHz(s.designFreq)} (don't reveal it). The app grades their answer (±${tolPct}%) and tells you.${remember(ctx, graded, 'value', String(a.question))}${read.note}`

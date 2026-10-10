@@ -188,3 +188,14 @@ describe('move questions: the right answer comes from the move calculator', () =
     expect(W * 2e-12 * Z0).toBeCloseTo(1.508, 2)
   })
 })
+
+describe('ohmsIn: impedances a question states in ohms', () => {
+  it('reads complex, real and word forms, with a decimal comma or a typographic minus', async () => {
+    const { ohmsIn } = await import('./tasks')
+    expect(ohmsIn('Your load is 100 + j50 Ω with Z0 = 50 Ω.')).toEqual([{ re: 100, im: 50 }, { re: 50, im: 0 }])
+    expect(ohmsIn('a 25 − j25 ohm load')).toEqual([{ re: 25, im: -25 }])
+    expect(ohmsIn('Z = 30,5 - 20j Ω')).toEqual([{ re: 30.5, im: -20 }])
+    expect(ohmsIn('R 30 Ω, X −20 Ω')).toEqual([{ re: 30, im: 0 }, { re: -20, im: 0 }])
+    expect(ohmsIn('z = 2 + j1 on the chart')).toEqual([])
+  })
+})

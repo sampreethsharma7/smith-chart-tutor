@@ -58,7 +58,8 @@ const ctx = {
   profile: () => app.profile,
   updateProfile: async (fn: (p: any) => any) => { app.profile = fn(app.profile) },
   learnerTurns: () => useTutor.getState().learnerTurns,
-  session: () => useTutor.getState().session
+  session: () => useTutor.getState().session,
+  recordExercise: () => {}
 } as any
 
 const F = 2.4e9
@@ -1446,5 +1447,102 @@ describe('item 5: a project from their goal, the route to it, and its final task
     await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, judge: true, why: 'Interview prep.' }, ctx)
     const r = await runTool('create_exercise', { title: 'P', instructions: 'x', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
     expect(r.content).toMatch(/Not yet|judge project/)
+  })
+})
+
+describe('fixes from the novice re-run (Riya, Sonnet 5.5)', () => {
+  const AT = new Date().toISOString()
+  const ANTENNA = { kind: 'antenna', topology: 'series', f0_hz: F, R: 15, Q: 6 }
+  const routeDone = () => {
+    const r = (rung: number) => ({ rung, streak: 0, misses: 0, tries: 0, source: 'answers', at: AT })
+    const c = { stage: 'chart', streak: 0, misses: 0, source: 'answers', at: AT }
+    app.profile = { ...app.profile, ladder: { lumped_moves: r(2), l_match: r(3) }, reading: { chart_basics: c, reflection: c, admittance: c } }
+  }
+  const solve = async () => {
+    const { solveLMatch } = await import('@shared/rf/solvers')
+    const { loadImpedance } = await import('@shared/rf/network')
+    for (const e of solveLMatch(loadImpedance(useStudio.getState().load, F, []), 50, F)[0].elements) useStudio.getState().addElement(e.kind, e.value)
+  }
+
+  it('a pass the tutor confirms (check_exercise) is recorded like Check, and completes the project (L11: "that\'s your project done", not marked)', async () => {
+    await runTool('set_capstone', { load: ANTENNA, f0_hz: F, max_vswr: 2, parts: 'lumped', why: 'x' }, ctx)
+    routeDone()
+    await runTool('create_exercise', { title: 'Project', instructions: 'Match it.', freq_hz: F, max_vswr: 2, capstone: true }, ctx)
+    await solve()
+    const before = (app.profile.answers ?? []).length
+    const r = await runTool('check_exercise', {}, ctx)
+    expect(r.content).toMatch(/"passed":true/)
+    expect(r.content).toMatch(/\[Recorded as passed, the same as pressing Check\.\]/)
+    expect(r.content).toMatch(/\[Project complete\]/)
+    expect(r.content).toMatch(/\[Follow-up\]/)
+    expect(app.profile.capstone.done).toBeTruthy()
+    expect(useStudio.getState().exercise?.status).toBe('passed')
+    const added = (app.profile.answers ?? []).slice(before)
+    expect(added).toHaveLength(1)
+    expect(added[0]).toMatchObject({ skill: 'l_match', format: 'task', outcome: 'correct' })
+    // Once only: checking again records nothing more.
+    const again = await runTool('check_exercise', {}, ctx)
+    expect(again.content).not.toMatch(/Recorded as passed/)
+    expect((app.profile.answers ?? []).length).toBe(before + 1)
+  })
+
+  it('closing a task as passed is the app\'s call: a real pass is recorded, a non-pass is refused', async () => {
+    await runTool('create_exercise', { title: 'Match it', instructions: 'Match the load.', freq_hz: F, max_vswr: 1.5 }, ctx)
+    const refused = await runTool('close_exercise', { outcome: 'passed' }, ctx)
+    expect(refused.isError).toBe(true)
+    expect(refused.content).toMatch(/It hasn't passed: NOT YET/)
+    expect(useStudio.getState().exercise).not.toBeNull()
+    await solve()
+    const before = (app.profile.answers ?? []).length
+    const r = await runTool('close_exercise', { outcome: 'passed' }, ctx)
+    expect(r.content).toMatch(/^Closed\. \[Recorded as passed/)
+    expect(useStudio.getState().exercise).toBeNull()
+    expect((app.profile.answers ?? []).length).toBe(before + 1)
+  })
+
+  it('an estimate by eye gets the by-eye tolerance even with the values shown (L2: 0.3 for 0.277 marked wrong)', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 30, X: -9.9 } }) // |Γ| 0.277
+    const ask = (q: string) => runTool('ask_value', { question: q, quantity: 'gamma_mag', from: 'load', values: 'shown', rung_reason: 'learner_asked' }, ctx)
+    await ask('About what |Γ| is the point at? Estimate from its distance from the centre.')
+    expect(useStudio.getState().prediction?.key).toMatchObject({ tolPct: 8, estimate: true })
+    expect(await answerNow('0.3', 'sure')).toBeNull()
+    expect(lastUserText(requests.at(-1)!)).toMatch(/CORRECT/)
+    // Asked to read the value, the read-off tolerance stays.
+    await ask('What is |Γ| at the load? Read it off.')
+    expect(useStudio.getState().prediction?.key).toMatchObject({ tolPct: 5 })
+    expect((useStudio.getState().prediction?.key as { estimate?: boolean }).estimate).toBeUndefined()
+  })
+
+  it('a question that states its own point is working, not reading: nothing covered, the reading stage untouched (L10)', async () => {
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: 50 } })
+    const reading = { stage: 'chart', streak: 0, misses: 0, source: 'answers', at: AT }
+    app.profile = { ...app.profile, reading: { chart_basics: reading, admittance: reading } }
+    const r = await runTool('ask_value', { question: 'Your load is 100 + j50 Ω with Z0 = 50 Ω. What is z there?', quantity: 'z', from: 'load' }, ctx)
+    expect(r.content).toMatch(/counts as working, not as reading/)
+    expect(useStudio.getState().prediction?.values).toBeUndefined()
+    expect(await answerNow('2 + j1', 'sure')).toBeNull()
+    expect(app.profile.answers.at(-1).values).toBeUndefined()
+    expect(app.profile.reading.chart_basics).toEqual(reading)
+    // y of a stated z is arithmetic too; a question that doesn't state the point is still a reading question.
+    await runTool('ask_value', { question: 'The load is z = 2 + j1. What is y?', quantity: 'y', from: 'load' }, ctx)
+    expect(useStudio.getState().prediction?.values).toBeUndefined()
+    useStudio.getState().setPrediction(null)
+    await runTool('ask_value', { question: 'Find the load on the chart. What is its z?', quantity: 'z', from: 'load' }, ctx)
+    expect(useStudio.getState().prediction?.values).toBe('covered')
+  })
+
+  it('a task that asks for two parts is refused when one part matches the load (L7: one shunt C passed "a full L-match")', async () => {
+    const scenario = { load: { kind: 'fixed', R: 25, X: 25 } } // y = 1 − j1: on g = 1
+    const r = await runTool('create_exercise', { title: 'Full L-match of a load with reactance', instructions: 'Match it with two parts, a series one and a shunt one.', freq_hz: F, max_vswr: 1.5, max_elements: 2, scenario }, ctx)
+    expect(r.isError).toBe(true)
+    expect(r.content).toMatch(/one part already matches this load \(Shunt C 1\.3\d* pF gives VSWR ≤ 1\.5\)/)
+    expect(useStudio.getState().exercise).toBeNull()
+    // As a one-part task it's fine; without asking for two parts it's set, and the tutor is told.
+    expect((await runTool('create_exercise', { title: 'One part', instructions: 'Match it with one part.', freq_hz: F, max_vswr: 1.5, max_elements: 1, scenario }, ctx)).isError).toBe(false)
+    const plain = await runTool('create_exercise', { title: 'Match it', instructions: 'Match the load.', freq_hz: F, max_vswr: 1.5, scenario }, ctx)
+    expect(plain.isError).toBe(false)
+    expect(plain.content).toMatch(/Note: one part alone \(Shunt C/)
+    // A load that needs two parts is set as asked.
+    expect((await runTool('create_exercise', { title: 'Two-part match', instructions: 'Match it with two parts.', freq_hz: F, max_vswr: 1.5, max_elements: 2, scenario: { load: { kind: 'fixed', R: 100, X: -75 } } }, ctx)).isError).toBe(false)
   })
 })

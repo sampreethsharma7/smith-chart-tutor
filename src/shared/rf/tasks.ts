@@ -267,6 +267,24 @@ export function pointNamedIn(question: string): { via: 'z' | 'y'; values: Comple
 }
 
 /**
+ * Impedances a question states in ohms ("your load is 100 + j50 Ω", "a 25 − j25 ohm load", "100 Ω"),
+ * not normalised. A pair like "R 30 Ω, X −20 Ω" isn't joined into one.
+ */
+export function ohmsIn(question: string): Complex[] {
+  const s = question.replace(/[−–—]/g, '-').replace(/\*\*|`|\$/g, '').replace(/(\d),(\d)/g, '$1.$2')
+  const out: Complex[] = []
+  for (const m of s.matchAll(/(Ω|\bohms?\b)/gi)) {
+    const before = s.slice(Math.max(0, m.index! - 40), m.index!)
+    const t = /(?:^|[^\w.])([-+]?\d*\.?\d+)\s*(?:([-+])\s*j\s*(\d*\.?\d+)|([-+])\s*(\d*\.?\d+)\s*j)?\s*$/.exec(before)
+    if (!t) continue
+    const im = t[3] ?? t[5]
+    const sign = (t[2] ?? t[4]) === '-' ? -1 : 1
+    out.push(c(Number(t[1]), im === undefined ? 0 : sign * Number(im)))
+  }
+  return out
+}
+
+/**
  * The complex number a text starts with ("0.5 + j1 on the chart" → 0.5 + j1, using 9 characters):
  * the longest run of number-like words that parses, stopping where two numbers meet ("j1.0 2 times").
  */
@@ -295,7 +313,8 @@ export interface ReasonKey { choices: string[]; correct: number; ideas: string[]
 export type QuestionKey =
   | { type: 'locate'; target: Complex; tol: number; targetText: string }
   | { type: 'move'; choices: string[]; correct: number; facts: string; reasons?: ReasonKey }
-  | { type: 'value'; quantity: Quantity; expected: number | Complex; tolPct: number; z0: number }
+  /** estimate: the question asks for a by-eye estimate, so its smallest slack is wider (floorFor × 1.5) */
+  | { type: 'value'; quantity: Quantity; expected: number | Complex; tolPct: number; z0: number; estimate?: boolean }
   /** A component value: the part (L or C, from the unit they type) and its size */
   | { type: 'component'; part: 'L' | 'C'; value: number; tolPct: number; facts: string; z0: number }
   /** Pick one, e.g. which step of a worked solution has the mistake; ideas[i] = what picking choice i wrongly shows */
@@ -417,7 +436,7 @@ export function gradeQuestion(key: QuestionKey, ans: QuestionAnswer): QuestionGr
     err = abs(sub(z, exp))
     scale = abs(exp)
   }
-  const allowed = Math.max((key.tolPct / 100) * scale, floorFor(key.quantity, key.z0))
+  const allowed = Math.max((key.tolPct / 100) * scale, floorFor(key.quantity, key.z0) * (key.estimate ? 1.5 : 1))
   const ok = err <= allowed
   return {
     status: ok ? 'correct' : 'wrong',

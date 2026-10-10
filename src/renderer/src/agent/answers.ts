@@ -7,6 +7,7 @@ import { addSlips, patternNews, slipsFor, type SlipFinding } from '@shared/patte
 import type { Outcome, SkillId, Sure } from '@shared/profile'
 import type { ValuesSeen } from '@shared/reading'
 import { useApp } from '@/state/app'
+import { completeProject, projectPassNote } from '@shared/capstone'
 import { useTutor } from './tutor'
 
 /**
@@ -88,15 +89,12 @@ async function checkOnce(ex: NonNullable<ReturnType<typeof useStudio.getState>['
     const forProject = ex.capstone.at
     const session = useTutor.getState().session?.id
     let marked = false
-    // Only the project this card was set for (they may have changed it on Progress while it was open).
     await useApp.getState().updateProfile((p) => {
-      if (!p.capstone || p.capstone.done || p.capstone.at !== forProject) return p
-      marked = true
-      return { ...p, capstone: { ...p.capstone, done: { at: new Date().toISOString(), ...(session ? { session } : {}) } } }
+      const r = completeProject(p, forProject, new Date().toISOString(), session)
+      marked = r.marked
+      return r.profile
     })
-    project = marked
-      ? '\n[Project complete] That was the final task of their project: it is now marked done on their Progress page. Celebrate it specifically (what they can now do for their real goal), then propose the next, harder project with set_capstone.'
-      : '\n[Project task] They passed the final task of a project they have since changed on Progress: praise the work; their current project is not marked done.'
+    project = `\n${projectPassNote(marked)}`
   }
   await useTutor.getState().send(`[${what} check #${next.attempts}] ${g.summary}. Network (load → source): ${net}.${miss}${project}${solved}${report ? `\n[Learner memory] ${report}` : ''}`, {
     learnerAction: true,

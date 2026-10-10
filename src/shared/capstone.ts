@@ -181,6 +181,20 @@ export type CapstoneStage = 'route' | 'final' | 'done'
 export const stageOf = (p: Profile, c: Capstone): CapstoneStage =>
   c.done ? 'done' : milestones(p, c).every((x) => x.met) ? (c.judge ? 'done' : 'final') : 'route'
 
+/**
+ * Their project's final task was passed: mark that project done, but only the project the task was
+ * set for (`forAt`, its `at`), which they may have changed on Progress while the card was open.
+ */
+export function completeProject(p: Profile, forAt: string, at: string, session?: string): { profile: Profile; marked: boolean } {
+  if (!p.capstone || p.capstone.done || p.capstone.at !== forAt) return { profile: p, marked: false }
+  return { profile: { ...p, capstone: { ...p.capstone, done: { at, ...(session ? { session } : {}) } } }, marked: true }
+}
+
+/** What the tutor is told after the final task passes (marked: it was this project's task). */
+export const projectPassNote = (marked: boolean) => marked
+  ? '[Project complete] That was the final task of their project: it is now marked done on their Progress page. Celebrate it specifically (what they can now do for their real goal), then propose the next, harder project with set_capstone.'
+  : '[Project task] They passed the final task of a project they have since changed on Progress: praise the work; their current project is not marked done.'
+
 /** The step after where they are on a milestone: the next rung up on that skill, or reading from the chart. */
 function nextStepOn(p: Profile, skill: SkillId, need: Need): string {
   if (need.kind === 'chart') return `${skillName(skill)}: reading values from the chart yourself`

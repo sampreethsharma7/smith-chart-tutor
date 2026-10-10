@@ -1,20 +1,33 @@
-import { loadImpedance, type ElementKind } from '@shared/rf/network'
+import { ELEMENT_LABEL, loadImpedance, type ElementKind, type NetworkElement } from '@shared/rf/network'
 import { metricsFromZ } from '@shared/rf/metrics'
 import { solveLMatch } from '@shared/rf/solvers'
-import { fmtC, fmtHz } from '@/lib/format'
+import { fmtC, fmtEng, fmtHz } from '@/lib/format'
 import { uid } from '@/state/studio'
-import { gradeExercise } from '@/state/exercise'
-import { defineTools } from '../types'
+import { FOLLOW_UP, gradeExercise } from '@/state/exercise'
+import type { Exercise } from '@/state/studio'
+import { defineTools, type ToolContext } from '../types'
 import { applyScenario, ELEMENT_KINDS, SCENARIO_PROPS } from './chart'
 import { aimFor, classifyMatch, inSituation, noteAsked, recordGraded, topicDef } from '@shared/memory'
-import { regionOf } from '@shared/rf/tasks'
+import { findReach, regionOf } from '@shared/rf/tasks'
+import { c, type Complex } from '@shared/rf/complex'
 import { matchIsGuided, rungOfMatch, withRung } from '@shared/ladder'
 import { fitRung, RUNG_REASON } from '../ladderFit'
-import { capstoneProblem, milestones, projectLoad as loadOfProject, stageOf, titleOf, type Capstone } from '@shared/capstone'
+import { capstoneProblem, completeProject, milestones, projectPassNote, projectLoad as loadOfProject, stageOf, titleOf, type Capstone } from '@shared/capstone'
 import type { Dataset, LoadModel } from '@shared/rf/network'
 
 const LUMPED_KINDS: ElementKind[] = ['seriesL', 'seriesC', 'shuntL', 'shuntC']
 const LINE_KINDS: ElementKind[] = ['tline', 'openStub', 'shortStub']
+/** Wording that asks for two parts: "two parts", "2 elements", "both parts", an L-match or L-network */
+const TWO_PARTS = /\b(two|2)\s+(parts|elements|components)\b|\bboth (parts|elements)\b|\bL[- ]?(match|network)\b/i
+
+/** One lumped part that alone brings the load to VSWR ≤ maxVswr at f, if there is one. */
+function onePartMatch(ZL: Complex, z0: number, f: number, maxVswr: number, kinds: ElementKind[]): NetworkElement | null {
+  const lumped = kinds.filter((k) => LUMPED_KINDS.includes(k))
+  if (!lumped.length) return null
+  // Inside the VSWR circle is within |Γ| = (s − 1)/(s + 1) of the centre.
+  const r = findReach(ZL, { type: 'point', z: c(1, 0), tol: (maxVswr - 1) / (maxVswr + 1), as: 'z' }, lumped, 1, f, z0)
+  return r.ok && r.network.length === 1 ? r.network[0] : null
+}
 
 /**
  * The final task of their project fills itself in from the project (capstone.ts), so it can't be
@@ -41,6 +54,42 @@ function capstoneTask(c: Capstone | undefined, a: any, datasets: Array<{ id: str
       scenario: { ...(a.scenario ?? {}), load: undefined, z0: c.z0 ?? 50 }
     }
   }
+}
+
+/**
+ * A pass the tutor found (check_exercise, or closing it as passed) without the learner pressing Check:
+ * recorded as the Check button would (answers.ts), so it reaches their record, and the final task of their
+ * project completes the project. Only the first pass counts. What to tell the tutor comes back.
+ */
+async function recordTutorPass(ctx: ToolContext, ex: Exercise): Promise<string> {
+  const next: Exercise = { ...ex, attempts: ex.attempts + 1, status: 'passed' }
+  ctx.studio.setExercise(next)
+  ctx.recordExercise({ title: ex.title, skill: ex.skill, passed: true, attempts: next.attempts })
+  const at = new Date().toISOString()
+  const session = ctx.session?.()?.id
+  let report = ''
+  let marked: boolean | null = null
+  await ctx.updateProfile((p) => {
+    let q = p
+    if (ex.graded) {
+      // Partly theirs when they talked it through or needed several tries (the Check button's rule).
+      const r = recordGraded(q, { meta: ex.graded, outcome: 'correct', label: ex.title, session: session ?? 'none', at, format: 'task', helped: !!ex.helped || next.attempts > 1 })
+      report = r.report
+      q = r.profile
+    }
+    if (ex.capstone) {
+      const c = completeProject(q, ex.capstone.at, at, session)
+      marked = c.marked
+      q = c.profile
+    }
+    return q
+  })
+  return [
+    '[Recorded as passed, the same as pressing Check.]',
+    ...(marked === null ? [] : [projectPassNote(marked)]),
+    ...(report ? [`[Learner memory] ${report}`] : []),
+    `[Follow-up] ${FOLLOW_UP}`
+  ].join('\n')
 }
 
 export default defineTools([
@@ -90,6 +139,8 @@ export default defineTools([
       if (projectLoad) ctx.studio.setLoad(projectLoad, 'the final task of your project uses its own load')
       const s = ctx.studio
       const kinds: string[] = a.allowed_kinds ?? []
+      const band = !!(a.band_low_hz && a.band_high_hz)
+      let onePartNote = ''
       const lumpedOnly = kinds.length > 0 && kinds.every((k) => !/tline|Stub/.test(k))
       if (project) {
         // The project's own check (across its band, with its parts), not the one-frequency L-match one below.
@@ -111,6 +162,14 @@ export default defineTools([
             : `no two-element L-match with practical values (0.05–500 nH, 0.01–500 pF${kinds.length ? ', allowed kinds' : ''}) exists for Z = ${fmtC(ZL, 'Ω')} at ${fmtHz(a.freq_hz)}`
           throw new Error(`Exercise not created: ${why}. Pick a frequency near where the load is used (check get_chart_state / analyze_sweep), or change the load in "scenario".`)
         }
+        // A task that asks for two parts (or an L-match) on a load one part can match isn't one: one part
+        // passes it (a novice re-run: 25 + j25 Ω already sits on g = 1, and one shunt C passed "a full L-match").
+        const one = !band && a.max_elements !== 1 ? onePartMatch(ZL, s.z0, a.freq_hz, a.max_vswr ?? 1.5, kinds.length ? (kinds as ElementKind[]) : LUMPED_KINDS) : null
+        if (one && TWO_PARTS.test(`${a.title ?? ''} ${a.instructions ?? ''}`)) {
+          s.loadSnapshot({ ...before })
+          throw new Error(`Exercise not created: it asks for two parts, but one part already matches this load (${ELEMENT_LABEL[one.kind]} ${fmtEng(one.value, one.kind.endsWith('L') ? 'H' : 'F')} gives VSWR ≤ ${a.max_vswr ?? 1.5}), so it isn't a two-part task. Pick a load off the r = 1 and g = 1 circles (one part can't reach the centre from there), or make it a one-part task (max_elements: 1).`)
+        }
+        if (one) onePartNote = ` Note: one part alone (${ELEMENT_LABEL[one.kind]} ${fmtEng(one.value, one.kind.endsWith('L') ? 'H' : 'F')}) passes this task.`
       }
       // A task graded across a band needs the band on screen; a one-frequency task doesn't
       // (the design point already marks freq_hz).
@@ -124,7 +183,6 @@ export default defineTools([
       }
       s.setAnnotations(() => [])
       const maxVswr = Number.isFinite(a.max_vswr) && a.max_vswr > 1 ? a.max_vswr : 1.5
-      const band = !!(a.band_low_hz && a.band_high_hz)
       const ZL = ctx.derived().design.load.z
       const kindsGiven = Array.isArray(a.allowed_kinds) ? a.allowed_kinds : undefined
       const instructions = String(a.instructions ?? '')
@@ -163,7 +221,7 @@ export default defineTools([
         // Graded on the project's own load and Z0, and tied to this project (it may be changed while the card is open).
         ...(project && projectLoad ? { capstone: { at: project.at, load: projectLoad, z0: s.z0, ...(project.load.kind === 'data' ? { datasetName: project.load.datasetName } : {}) } } : {})
       })
-      return `Exercise card shown. Practises: ${topicDef(graded.topic)!.name} (${graded.topic}), level ${graded.difficulty}${aim !== undefined ? `; their aim for it is ${aim}` : ''}.${fit} Now wait for the learner to work on it; they will press Check or talk to you.`
+      return `Exercise card shown. Practises: ${topicDef(graded.topic)!.name} (${graded.topic}), level ${graded.difficulty}${aim !== undefined ? `; their aim for it is ${aim}` : ''}.${fit} Now wait for the learner to work on it; they will press Check or talk to you.${onePartNote}`
     }
   },
   {
@@ -171,10 +229,13 @@ export default defineTools([
     description: 'Grade the learner\'s current network against the active exercise (exact numbers). The learner\'s own "Check" presses are reported to you automatically, so only call this if you need a fresh grade.',
     parameters: { type: 'object', properties: {} },
     activity: () => 'Grading the exercise',
-    run(_a, ctx) {
+    async run(_a, ctx) {
       const ex = ctx.studio.exercise
       if (!ex) return 'No active exercise.'
-      return gradeExercise(ex)
+      const g = gradeExercise(ex)
+      // Passed while they talked it through instead of pressing Check: it counts the same (the project too).
+      if (g.passed && ex.status !== 'passed') return `${JSON.stringify(g)}\n${await recordTutorPass(ctx, ex)}`
+      return g
     }
   },
   {
@@ -185,6 +246,14 @@ export default defineTools([
     async run(a, ctx) {
       const ex = ctx.studio.exercise
       if (!ex) return 'No active exercise.'
+      // "Passed" is the app's call, not the tutor's: a pass not yet recorded is checked and recorded now.
+      if (a.outcome === 'passed' && ex.status !== 'passed') {
+        const g = gradeExercise(ex)
+        if (!g.passed) throw new Error(`It hasn't passed: ${g.summary}. Let them keep working, or close it as given_up.`)
+        const note = await recordTutorPass(ctx, ex)
+        ctx.studio.setExercise(null)
+        return `Closed. ${note}`
+      }
       ctx.recordExercise({ title: ex.title, skill: ex.skill, passed: a.outcome === 'passed', attempts: ex.attempts })
       ctx.studio.setExercise(null)
       // Giving up on a task they never passed is graded evidence too (a pass was recorded when it happened).
