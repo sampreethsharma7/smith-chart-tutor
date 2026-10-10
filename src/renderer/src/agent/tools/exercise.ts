@@ -12,6 +12,9 @@ import { findReach, regionOf } from '@shared/rf/tasks'
 import { c, type Complex } from '@shared/rf/complex'
 import { matchIsGuided, rungOfMatch, withRung } from '@shared/ladder'
 import { fitRung, RUNG_REASON } from '../ladderFit'
+import { checkRepeat, checkReuse } from '../repeatFit'
+import { taskSignature } from '@shared/course'
+import { partValuesOf } from '@shared/rf/giveaway'
 import { capstoneProblem, completeProject, milestones, projectPassNote, projectLoad as loadOfProject, stageOf, titleOf, type Capstone } from '@shared/capstone'
 import type { Dataset, LoadModel } from '@shared/rf/network'
 
@@ -73,7 +76,7 @@ async function recordTutorPass(ctx: ToolContext, ex: Exercise): Promise<string> 
     let q = p
     if (ex.graded) {
       // Partly theirs when they talked it through or needed several tries (the Check button's rule).
-      const r = recordGraded(q, { meta: ex.graded, outcome: 'correct', label: ex.title, session: session ?? 'none', at, format: 'task', helped: !!ex.helped || next.attempts > 1 })
+      const r = recordGraded(q, { meta: ex.graded, outcome: 'correct', label: ex.title, session: session ?? 'none', at, format: 'task', helped: !!ex.helped || next.attempts > 1, parts: partValuesOf(ctx.studio.network) })
       report = r.report
       q = r.profile
     }
@@ -141,6 +144,7 @@ export default defineTools([
       const kinds: string[] = a.allowed_kinds ?? []
       const band = !!(a.band_low_hz && a.band_high_hz)
       let onePartNote = ''
+      let solutions: Array<Array<{ value: number; unit: 'H' | 'F' | 'deg' }>> = []
       const lumpedOnly = kinds.length > 0 && kinds.every((k) => !/tline|Stub/.test(k))
       if (project) {
         // The project's own check (across its band, with its parts), not the one-frequency L-match one below.
@@ -170,6 +174,19 @@ export default defineTools([
           throw new Error(`Exercise not created: it asks for two parts, but one part already matches this load (${ELEMENT_LABEL[one.kind]} ${fmtEng(one.value, one.kind.endsWith('L') ? 'H' : 'F')} gives VSWR ≤ ${a.max_vswr ?? 1.5}), so it isn't a two-part task. Pick a load off the r = 1 and g = 1 circles (one part can't reach the centre from there), or make it a one-part task (max_elements: 1).`)
         }
         if (one) onePartNote = ` Note: one part alone (${ELEMENT_LABEL[one.kind]} ${fmtEng(one.value, one.kind.endsWith('L') ? 'H' : 'F')}) passes this task.`
+        solutions = sols.map((sol) => partValuesOf(sol.elements))
+      }
+      // Not one they just did, nor one whose answers are part values they just used (repeats.ts). The
+      // project's final task is exempt: it is their project's own load, whatever came before.
+      const sig = taskSignature('match', c(ctx.derived().design.load.z.re, ctx.derived().design.load.z.im), `vswr ${a.max_vswr ?? 1.5}${band ? ` ${a.band_low_hz}-${a.band_high_hz}` : ''}`, kinds)
+      if (!project) {
+        try {
+          checkRepeat(ctx, sig)
+          if (solutions.length) checkReuse(ctx, solutions)
+        } catch (e) {
+          s.loadSnapshot({ ...before })
+          throw e
+        }
       }
       // A task graded across a band needs the band on screen; a one-frequency task doesn't
       // (the design point already marks freq_hz).
@@ -206,7 +223,7 @@ export default defineTools([
       const aim = ctx.profile?.() ? aimFor(ctx.profile(), graded.topic) : undefined
       s.setExercise({
         id: uid('ex'),
-        graded,
+        graded: { ...graded, sig },
         title: a.title,
         instructions: a.instructions,
         skill: a.skill,

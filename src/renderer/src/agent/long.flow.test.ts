@@ -84,7 +84,7 @@ describe('a learner who keeps chatting for hours', () => {
       const kind = i % 6
       if (kind === 0) script.push(call('get_chart_state', {}), text(`Reply ${i}. ${'Here is a careful explanation. '.repeat(8)}`))
       else if (kind === 1) script.push(call('what_if', { start: 'load', elements: [{ kind: 'tline', value: 45, zc: 50 }] }), call('rf_calculate', { operation: 'convert', value: '30+j20' }), text(`Reply ${i}.`))
-      else if (kind === 2) script.push(call('ask_move', { element: { kind: 'shuntC', value: 2e-12 }, from: 'load' }, 'A quick question:'))
+      else if (kind === 2) script.push(call('ask_move', { element: { kind: 'shuntC', value: (0.5 + (i / 6) * 0.05) * 1e-12 }, from: 'load' }, 'A quick question:'))
       else script.push(text(`Reply ${i}. ${'Think about the constant-r circle. '.repeat(6)}`))
       await useTutor.getState().send(long(i))
       // Answer the card on the next turn, sometimes instead of typing.

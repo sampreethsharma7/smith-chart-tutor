@@ -29,7 +29,7 @@ export function partValuesIn(text: string): PartValue[] {
 }
 
 /** A network's part values in the same terms: L in H, C in F, lines and stubs in degrees (resistors have none here). */
-export function partValuesOf(network: NetworkElement[]): Array<Omit<PartValue, 'text'>> {
+export function partValuesOf(network: Array<Pick<NetworkElement, 'kind' | 'value'>>):Array<Omit<PartValue, 'text'>> {
   return network.flatMap((e): Array<Omit<PartValue, 'text'>> => (e.kind.endsWith('L') ? [{ value: e.value, unit: 'H' }]
     : e.kind.endsWith('C') ? [{ value: e.value, unit: 'F' }]
       : e.kind === 'tline' || e.kind.endsWith('Stub') ? [{ value: e.value, unit: 'deg' }] : []))

@@ -2,7 +2,8 @@ import { ELEMENT_LABEL } from '@shared/rf/network'
 import { gradeQuestion, type QuestionKey } from '@shared/rf/tasks'
 import { elementValueText, useStudio } from '@/state/studio'
 import { FOLLOW_UP, gradeExercise, solutionFacts, type ExerciseGrade } from '@/state/exercise'
-import { recordGraded, type AnswerFormat, type GradedMeta } from '@shared/memory'
+import { recordGraded, type AnswerFormat, type GradedMeta, type GradedResult } from '@shared/memory'
+import { partValuesOf } from '@shared/rf/giveaway'
 import { addSlips, patternNews, slipsFor, type SlipFinding } from '@shared/patterns'
 import type { Outcome, SkillId, Sure } from '@shared/profile'
 import type { ValuesSeen } from '@shared/reading'
@@ -17,7 +18,7 @@ import { useTutor } from './tutor'
  */
 async function remember(
   meta: GradedMeta | undefined, outcome: Outcome, label: string,
-  how: { misconception?: string; format?: AnswerFormat; choices?: number; helped?: boolean; sure?: Sure; slips?: SlipFinding[]; values?: ValuesSeen } = {}
+  how: { misconception?: string; format?: AnswerFormat; choices?: number; helped?: boolean; sure?: Sure; slips?: SlipFinding[]; values?: ValuesSeen; parts?: GradedResult['parts'] } = {}
 ): Promise<string> {
   const app = useApp.getState()
   if (!meta || !app.profile) return ''
@@ -81,7 +82,7 @@ async function checkOnce(ex: NonNullable<ReturnType<typeof useStudio.getState>['
   const solved = firstPass ? `\n[Their solution, each move verified]\n${solutionFacts(ex)}\n[Follow-up] ${FOLLOW_UP}` : ''
   // Only a first pass is evidence (checks before it are work in progress). Right first time and on their
   // own is fully theirs; after several checks or talking it through with the tutor, partly.
-  const report = firstPass ? await remember(ex.graded, 'correct', ex.title, { format: 'task', helped: !!ex.helped || next.attempts > 1 }) : ''
+  const report = firstPass ? await remember(ex.graded, 'correct', ex.title, { format: 'task', helped: !!ex.helped || next.attempts > 1, parts: partValuesOf(st.network) }) : ''
   const miss = g.tutorNote ? `\n[Which way they missed, from the app] ${g.tutorNote}` : ''
   // The final task of their project, passed: the project is done (capstone.ts).
   let project = ''

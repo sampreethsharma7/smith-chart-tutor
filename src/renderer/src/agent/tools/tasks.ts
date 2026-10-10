@@ -13,6 +13,9 @@ import { aimFor, classifyLocate, classifyMove, classifyReach, classifyValue, inS
 import { uid } from '@/state/studio'
 import { RUNG_COMPONENT, RUNG_SPOT, rungOfMove, rungOfReach, withRung } from '@shared/ladder'
 import { fitRung, fitValues, RUNG_REASON, VALUES } from '../ladderFit'
+import { checkRepeat, checkReuse, showCard } from '../repeatFit'
+import { taskSignature } from '@shared/course'
+import { partValuesOf } from '@shared/rf/giveaway'
 import { defineTools, type ToolContext } from '../types'
 import { applyScenario, ELEMENT_KINDS, SCENARIO_PROPS } from './chart'
 import { typicalValue } from './compute'
@@ -168,12 +171,16 @@ export default defineTools([
           inSituation(classifyReach(kinds, toAdd, target.type === 'point'), `${regionOf(z)} → ${target.type === 'point' ? 'a point' : `a ${target.family} circle`}`),
           rungOfReach(Array.isArray(a.allowed_kinds) ? kinds : undefined, String(a.instructions))
         )
+        // Not one they just did, nor one whose answer is a part value they just used (repeats.ts).
+        const sig = taskSignature('reach', z, JSON.stringify(target), kinds)
+        checkRepeat(ctx, sig)
+        if (found.ok) checkReuse(ctx, [partValuesOf(found.network)])
         const fit = fitRung(ctx, graded, a.rung_reason)
         s.setAnnotations(() => [])
         s.setExercise({
           id: uid('ex'),
           kind: 'reach',
-          graded,
+          graded: { ...graded, sig },
           title: String(a.title),
           instructions: String(a.instructions),
           skill: a.skill,
@@ -255,7 +262,7 @@ export default defineTools([
       // A plain point is reading: the hover tip and readout would answer it, so they're covered (reading.ts).
       const read = a.element ? null : fitValues(ctx, graded, a.values, a.rung_reason)
       const targetText = `${what} (y = ${fmtNorm(admittanceOf(z))})`
-      s.setPrediction({
+      showCard(ctx, {
         id: uid('q'), question: String(a.question), kind: 'click', title: a.title ?? short(String(a.question)), skill: a.skill,
         key: { type: 'locate', target: gammaFromZ(z, 1), tol, targetText }, graded, ...(read ? { values: read.values } : {})
       })
@@ -298,7 +305,7 @@ export default defineTools([
           : `If you add a ${ELEMENT_LABEL[el.kind]} to ${what}, how does the point move?`
       const graded = withRung(inSituation(classifyMove(el.kind, ask, withReason), `from the ${q.startHalf === 'on the real axis' ? 'real axis' : `${q.startHalf} half`}${ask === 'end_half' ? ', where it ends' : ''}`), rungOfMove(withReason))
       const fit = fitRung(ctx, graded, a.rung_reason)
-      s.setPrediction({
+      showCard(ctx, {
         id: uid('q'), question, kind: 'mcq', choices: q.choices, title: a.title ?? short(question), skill: a.skill,
         key: { type: 'move', choices: q.choices, correct: q.correct, facts: q.facts, ...(withReason ? { reasons: q.reasons } : {}) }, graded
       })
@@ -349,7 +356,7 @@ export default defineTools([
       // question asks them to estimate, values shown or not (a novice re-run marked a good by-eye 0.3 for 0.277 wrong).
       const estimate = ESTIMATE.test(String(a.question))
       const tolPct = Number.isFinite(a.tolerance_pct) ? Math.min(20, Math.max(1, a.tolerance_pct)) : read.values === 'covered' || estimate ? 8 : 5
-      s.setPrediction({
+      showCard(ctx, {
         id: uid('q'), question: String(a.question), kind: 'text', hint: QUANTITIES[quantity].hint, title: a.title ?? short(String(a.question)), skill: a.skill,
         key: { type: 'value', quantity, expected, tolPct, z0: s.z0, ...(estimate ? { estimate } : {}) }, graded, values: read.values
       })
@@ -387,7 +394,7 @@ export default defineTools([
       const graded = withRung(inSituation({ topic, skill: topicDef(topic)!.skill, difficulty: q.difficulty }, `spot the mistake: ${mistake}`), RUNG_SPOT)
       const fit = fitRung(ctx, graded, a.rung_reason)
       const question = q.body
-      s.setPrediction({
+      showCard(ctx, {
         id: uid('q'), question, kind: 'mcq', choices: q.choices, title: a.title ?? 'Spot the mistake in a worked match',
         key: { type: 'pick', choices: q.choices, correct: q.correct, facts: q.facts, ideas: q.choices.map((_, i) => (i === 4 && q.missedIdea ? q.missedIdea : '')), missed: MISTAKE_CONFUSION[mistake] },
         graded
@@ -434,7 +441,7 @@ export default defineTools([
       const graded = withRung(inSituation({ topic: 'part_value', skill: 'l_match', difficulty: conn === 'series' ? 2 : 3 }, `${conn}, ${sign} ${conn === 'series' ? 'x' : 'b'}`), RUNG_COMPONENT)
       const fit = fitRung(ctx, graded, a.rung_reason)
       const working = r.steps.map((x) => x.label).join(' → ')
-      s.setPrediction({
+      showCard(ctx, {
         id: uid('q'), question: String(a.question), kind: 'text', hint: 'value with its unit, e.g. 2.7 nH or 1.1 pF', title: a.title ?? short(String(a.question)),
         key: { type: 'component', part, value: r.component.value, tolPct, z0: s.z0, facts: `Exact: ${r.component.text} (${r.outputs.map((o) => `${o.label} ${o.text}`).join('; ')}).` },
         graded

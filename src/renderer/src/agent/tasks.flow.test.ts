@@ -540,10 +540,10 @@ describe('help is noticed: the answer then counts as partly theirs', () => {
   })
 
   it('a task passed on the first check, alone, is fully theirs; after several checks, partly', async () => {
-    const solve = async () => {
+    const solve = async (Z = c(30, 20)) => {
       const r = await runTool('create_target_task', { title: 'Onto g = 1', instructions: 'One series element.', target: { circle: { family: 'g', value: 1 } }, allowed_kinds: ['seriesL', 'seriesC'] }, ctx)
       expect(r.isError).toBe(false)
-      return findReach(c(30, 20), parseTarget({ circle: { family: 'g', value: 1 } }), ['seriesL', 'seriesC'], 1, F, 50).network[0]
+      return findReach(Z, parseTarget({ circle: { family: 'g', value: 1 } }), ['seriesL', 'seriesC'], 1, F, 50).network[0]
     }
     const el = await solve()
     useStudio.getState().addElement(el.kind, el.value)
@@ -551,9 +551,9 @@ describe('help is noticed: the answer then counts as partly theirs', () => {
     await checkExerciseAsync()
     await idle()
     expect(lastUserText(requests.at(-2) ?? requests.at(-1)!)).not.toMatch(/partly right/)
-    // Again, but with a wrong first check.
-    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 30, X: 20 } })
-    const el2 = await solve()
+    // Again (a new load: the same task again would be a repeat), but with a wrong first check.
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 40, X: 30 } })
+    const el2 = await solve(c(40, 30))
     script.push(text('Not yet.'))
     await checkExerciseAsync()
     await idle()
@@ -838,7 +838,8 @@ describe('ask_component: the step from the chart to a real part, graded', () => 
     await answerNow(`${(C * 1e12).toFixed(3)}pF`, 'sure')
     await idle()
     expect(lastUserText(requests.at(-1)!)).toMatch(/CORRECT: they answered a capacitor/)
-    await runTool('ask_component', { question: 'Shunt part for b = +0.8?', connection: 'shunt', amount: 0.8 }, ctx)
+    // A new amount: the same item again, just answered right, would be a repeat.
+    await runTool('ask_component', { question: 'Shunt part for b = +0.6?', connection: 'shunt', amount: 0.6 }, ctx)
     script.push(text('Which sign does an inductor add in shunt?'))
     await answerNow('3 nH', 'sure')
     await idle()
@@ -1507,7 +1508,8 @@ describe('fixes from the novice re-run (Riya, Sonnet 5.5)', () => {
     expect(useStudio.getState().prediction?.key).toMatchObject({ tolPct: 8, estimate: true })
     expect(await answerNow('0.3', 'sure')).toBeNull()
     expect(lastUserText(requests.at(-1)!)).toMatch(/CORRECT/)
-    // Asked to read the value, the read-off tolerance stays.
+    // Asked to read the value (at another point: the same item again would be a repeat), the read-off tolerance stays.
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 80, X: 20 } })
     await ask('What is |Γ| at the load? Read it off.')
     expect(useStudio.getState().prediction?.key).toMatchObject({ tolPct: 5 })
     expect((useStudio.getState().prediction?.key as { estimate?: boolean }).estimate).toBeUndefined()
@@ -1527,6 +1529,7 @@ describe('fixes from the novice re-run (Riya, Sonnet 5.5)', () => {
     await runTool('ask_value', { question: 'The load is z = 2 + j1. What is y?', quantity: 'y', from: 'load' }, ctx)
     expect(useStudio.getState().prediction?.values).toBeUndefined()
     useStudio.getState().setPrediction(null)
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 80, X: -30 } })
     await runTool('ask_value', { question: 'Find the load on the chart. What is its z?', quantity: 'z', from: 'load' }, ctx)
     expect(useStudio.getState().prediction?.values).toBe('covered')
   })
@@ -1599,5 +1602,55 @@ describe('the project\'s final task is the learner\'s own work: its part values 
     await useTutor.getState().send('I added the L')
     await idle()
     expect(useTutor.getState().items.filter((i) => i.kind === 'tutor').at(-1)?.text).toContain(value)
+  })
+})
+
+describe('no repeats (item 3, from the Riya re-run)', () => {
+  it('an item answered right is refused while it is fresh; after a miss it may come back', async () => {
+    useTutor.setState({ session: { id: 'L1', startedAt: new Date().toISOString(), transcript: [], exercises: [] } })
+    const ask = () => runTool('ask_value', { question: 'What is the VSWR of the load?', quantity: 'vswr', from: 'load', values: 'shown', rung_reason: 'learner_asked' }, ctx)
+    expect((await ask()).isError).toBe(false)
+    script.push(text('Right.'))
+    await answerNow('2.04', 'sure')
+    await idle()
+    expect(app.profile.answers.at(-1).sig).toBe('value:vswr:2.04')
+    const again = await ask()
+    expect(again.isError).toBe(true)
+    expect(again.content).toMatch(/Already asked: they answered this exact item right earlier this lesson/)
+    expect(useStudio.getState().prediction).toBeNull()
+    // Reworded, it is still the same item.
+    expect((await runTool('ask_value', { question: 'Read the VSWR at your load point.', quantity: 'vswr', from: 'load', values: 'shown', rung_reason: 'learner_asked' }, ctx)).isError).toBe(true)
+    // Another point is a new item.
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 100, X: 50 } })
+    expect((await ask()).isError).toBe(false)
+    script.push(text('Not quite.'))
+    await answerNow('1.5', 'sure')
+    await idle()
+    // Missed: asking it again re-checks it.
+    expect((await ask()).isError).toBe(false)
+  })
+
+  it('a task whose answer is the part value they just used is refused (three tasks in a row needed 3.3 nH)', async () => {
+    useTutor.setState({ session: { id: 'L1', startedAt: new Date().toISOString(), transcript: [], exercises: [] } })
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 25, X: -25 } })
+    const first = await runTool('create_target_task', { title: 'To the centre', instructions: 'One shunt part.', target: { point: { r: 1, x: 0 } }, allowed_kinds: ['shuntL', 'shuntC'] }, ctx)
+    expect(first.isError).toBe(false)
+    useStudio.getState().addElement('shuntL', 3.32e-9)
+    script.push(text('Nice.'), text('Why?'))
+    expect((await checkExerciseAsync())?.passed).toBe(true)
+    await idle()
+    expect(app.profile.answers.at(-1).parts).toEqual([{ value: 3.32e-9, unit: 'H' }])
+    // 25 − j50 Ω to the real axis with a series part: series L 3.3 nH again.
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 25, X: -50 } })
+    const second = await runTool('create_target_task', { title: 'To the real axis', instructions: 'One series part.', target: { circle: { family: 'x', value: 0 } }, allowed_kinds: ['seriesL', 'seriesC'] }, ctx)
+    expect(second.isError).toBe(true)
+    expect(second.content).toMatch(/Not set: every way to solve it uses the same part values as their last tasks \(3\.3\d* nH\)/)
+    expect(useStudio.getState().exercise).toBeNull()
+    // A load that needs a new value is set.
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 25, X: -80 } })
+    expect((await runTool('create_target_task', { title: 'To the real axis', instructions: 'One series part.', target: { circle: { family: 'x', value: 0 } }, allowed_kinds: ['seriesL', 'seriesC'] }, ctx)).isError).toBe(false)
+    // The same task they just passed is refused too.
+    useStudio.getState().loadSnapshot({ ...DEFAULT_SNAPSHOT, load: { kind: 'fixed', R: 25, X: -25 } })
+    expect((await runTool('create_target_task', { title: 'Centre again', instructions: 'One shunt part.', target: { point: { r: 1, x: 0 } }, allowed_kinds: ['shuntL', 'shuntC'] }, ctx)).content).toMatch(/Error in create_target_task: Already asked/)
   })
 })

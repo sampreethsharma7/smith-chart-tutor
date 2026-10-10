@@ -22,7 +22,7 @@ describe('part values of the final task are the learner\'s to find', () => {
   })
 
   it('their own value on the chart is theirs to talk about', () => {
-    const own = partValuesOf([{ id: 'a', kind: 'seriesL', value: 2.28e-9 }, { id: 'b', kind: 'shortStub', value: 40 }])
+    const own = partValuesOf([{ kind: 'seriesL', value: 2.28e-9 }, { kind: 'shortStub', value: 40 }])
     expect(own).toEqual([{ value: 2.28e-9, unit: 'H' }, { value: 40, unit: 'deg' }])
     expect(giveaways('Your 2.28 nH put you on g = 1; now the shunt C of 1.09 pF.', REFS, own)).toEqual(['1.09 pF'])
   })

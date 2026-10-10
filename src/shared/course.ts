@@ -138,6 +138,12 @@ export function itemSignature(key: QuestionKey): string {
   }
 }
 
+/** A task, by what it asks: its kind, where the point starts (normalised), its goal and the parts allowed. */
+export function taskSignature(kind: 'match' | 'reach', z: Complex, goal: string, kinds?: string[]): string {
+  const q = (x: number) => (Math.round(x / 0.05) * 0.05).toFixed(2)
+  return `task:${kind}:${q(z.re)},${q(z.im)}:${goal}:${[...(kinds ?? [])].sort().join('+')}`
+}
+
 /** Short beginner lines for when no card is open. */
 export const CHAT = {
   next: ['ok', 'ok, got it', "what's next?", 'ok, makes sense', 'cool, go on'],

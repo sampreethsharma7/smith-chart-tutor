@@ -56,6 +56,8 @@ export interface GradedMeta {
   ctx?: string
   /** How much of it the learner decides (ladder.ts), for skills on the ladder */
   rung?: Rung
+  /** The item itself (course.ts itemSignature): recorded with the answer so it isn't repeated while fresh */
+  sig?: string
 }
 
 /** How the answer was given: a pick from choices proves less than a click, a value or a task. */
@@ -238,6 +240,8 @@ export interface GradedResult {
   sure?: Sure
   /** Reading questions: whether the values were covered while they answered (reading.ts) */
   values?: ValuesSeen
+  /** Tasks: the part values of their passing network */
+  parts?: Array<{ value: number; unit: 'H' | 'F' | 'deg' }>
 }
 
 /** What each answer told us about how well they judge themselves, put together. */
@@ -380,7 +384,7 @@ export function recordGraded(p: Profile, r: GradedResult): { profile: Profile; r
     answers: [...(p.answers ?? []), {
       at, session: r.session, topic: m.topic, skill: m.skill, difficulty: m.difficulty, outcome: r.outcome,
       ...(r.sure ? { sure: r.sure } : {}), ...(r.helped ? { helped: true } : {}), ...(r.format ? { format: r.format } : {}), ...(m.ctx ? { ctx: m.ctx } : {}),
-      ...(m.rung ? { rung: m.rung } : {}), ...(r.values ? { values: r.values } : {})
+      ...(m.rung ? { rung: m.rung } : {}), ...(r.values ? { values: r.values } : {}), ...(m.sig ? { sig: m.sig } : {}), ...(r.parts?.length ? { parts: r.parts } : {})
     }].slice(-ANSWER_LOG_MAX)
   }
   // A judge project has no final task: it's done the moment this answer completes its route (kept done

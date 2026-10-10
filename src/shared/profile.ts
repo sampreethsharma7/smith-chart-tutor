@@ -349,6 +349,10 @@ export interface AnswerRecord {
   rung?: Rung
   /** Reading questions: whether the values were covered, shown, or uncovered by them (reading.ts) */
   values?: ValuesSeen
+  /** The item itself (course.ts itemSignature), so it isn't asked again while it's fresh (repeats.ts) */
+  sig?: string
+  /** Tasks: the part values of their passing network (repeats.ts reusedValues) */
+  parts?: Array<{ value: number; unit: 'H' | 'F' | 'deg' }>
 }
 
 export const ANSWER_LOG_MAX = 1000

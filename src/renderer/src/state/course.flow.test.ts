@@ -156,12 +156,13 @@ describe('a course run drives the real tutor through lessons and scores them', (
     expect(r.facts.finished).toBeGreaterThan(0)
     expect(r.facts.requests).toBe(app.requests + app.summaries)
     expect(r.facts.tokens).toBe(110 * r.facts.requests)
-    // What it asked, by what was asked: a new point each lesson, the same VSWR each time (a repeat when it was answered right).
+    // What it asked, by what was asked: a new point each lesson. The fake tutor asks the load's VSWR every
+    // lesson; once it's answered right the app refuses it (and the same task) as a repeat: none get through.
     expect(r.items.filter((i: any) => i.kind === 'locate').map((i: any) => i.sig)).toHaveLength(new Set(r.items.filter((i: any) => i.kind === 'locate').map((i: any) => i.sig)).size)
     const loadVswr = r.items.filter((i: any) => i.sig === 'value:vswr:2.04')
-    expect(loadVswr.length).toBeGreaterThan(1)
-    // Each one after a right answer to it is a repeat (the same task each lesson can add more).
-    expect(r.facts.duplicates).toBeGreaterThanOrEqual(loadVswr.slice(0, -1).filter((i: any) => i.outcome === 'correct').length)
+    expect(loadVswr.length).toBeGreaterThan(0)
+    expect(r.facts.duplicates).toBe(0)
+    if (loadVswr[0].outcome === 'correct') expect(r.issues.some((i: any) => i.kind === 'tool-error' && i.detail === 'ask_value')).toBe(true)
     expect(r.scores.overall).toBeGreaterThan(0)
     expect(r.scores.overall).toBeLessThanOrEqual(1)
   }, 60000)

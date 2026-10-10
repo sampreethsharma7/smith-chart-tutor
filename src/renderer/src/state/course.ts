@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createProfile, type Profile, type SkillId } from '@shared/profile'
-import { answerFor, chanceRight, chatLine, COURSE_VERSION, independenceSteps, itemSignature, learn, MAX_ACTIONS, REQUEST_CAP_PER_LESSON, rng, scoreCourse, START_ABILITY, sureOf, type CourseIssue, type CourseItem, type CourseLesson, type CourseReport } from '@shared/course'
+import { answerFor, chanceRight, chatLine, COURSE_VERSION, independenceSteps, itemSignature, learn, MAX_ACTIONS, REQUEST_CAP_PER_LESSON, rng, scoreCourse, taskSignature as sharedTaskSignature, START_ABILITY, sureOf, type CourseIssue, type CourseItem, type CourseLesson, type CourseReport } from '@shared/course'
 import { DEFAULT_TASK_KINDS, findReach, gradeQuestion } from '@shared/rf/tasks'
 import { matchCandidates } from '@shared/rf/design'
 import { inputImpedance, loadImpedance, type NetworkElement } from '@shared/rf/network'
@@ -320,8 +320,7 @@ async function course(profileId: string, provider: { id: string; label: string; 
 function taskSignature(ex: Exercise): string {
   const s = useStudio.getState()
   const Z = loadImpedance(s.load, ex.freqHz, s.datasets)
-  const r = (x: number) => Math.round(x)
-  return `task:${ex.kind ?? 'match'}:${r(Z.re)},${r(Z.im)}:${ex.target ? JSON.stringify(ex.target) : ex.maxVswr}:${[...(ex.allowedKinds ?? [])].sort().join('+')}`
+  return sharedTaskSignature(ex.kind ?? 'match', { re: Z.re / s.z0, im: Z.im / s.z0 }, ex.target ? JSON.stringify(ex.target) : `vswr ${ex.maxVswr ?? 1.5}`, ex.allowedKinds)
 }
 
 /**
