@@ -172,7 +172,8 @@ export interface LadderMove { state: LadderState; pace?: number; note?: string }
  * One graded answer on a ladder item. outcome is after the downgrades (help or a guess makes a right
  * answer partial); fragile = right but unsure.
  *   up:    enough clean answers at the rung (climbAfter), or one step for a clean pass on a harder item
- *   stay:  right but unsure, helped, partly right, a wrong guess, a miss on a stretch
+ *   half:  right but unsure (two count as one clean answer)
+ *   stay:  helped, partly right, a wrong guess, a miss on a stretch
  *   down:  a sure miss at or below the rung, two misses in a row, or a miss on a provisional rung
  */
 export function moveOnLadder(p: Profile, m: GradedMeta, outcome: Outcome, sure: Sure | undefined, fragile: boolean, at: string): LadderMove | null {
@@ -210,7 +211,18 @@ export function moveOnLadder(p: Profile, m: GradedMeta, outcome: Outcome, sure: 
     return { state: { ...st, streak: 0, misses } }
   }
   if (outcome === 'incorrect') return { state: st } // a miss on a stretch is expected
-  if (fragile) return { state: st } // right but unsure: neither proof nor a miss
+  if (fragile && outcome === 'correct' && rel >= 0) {
+    // Right but unsure, at or above their rung: half the proof of a sure answer (two count as one), so a
+    // learner who is right but always "not sure" still climbs, more slowly. Never a jump on its own.
+    const streak = st.streak + 0.5
+    const up = above(m.skill, st.rung)
+    const confirmed = streak >= 1 && st.provisional ? { provisional: false, source: 'answers' as const } : {}
+    if (streak >= climbAfter(p) && up) {
+      return { state: { ...st, ...confirmed, rung: up, streak: 0, misses: 0, tries: 0 }, pace: st.tries, note: `up: ${name(was.rung)} → ${name(up)} (right but unsure counts half)` }
+    }
+    return { state: { ...st, ...confirmed, streak, misses: 0 } }
+  }
+  if (fragile) return { state: st } // right but unsure on an easier item: neither proof nor a miss
   return { state: { ...st, streak: 0 } } // partly right, or right with help
 }
 

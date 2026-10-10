@@ -44,8 +44,8 @@ describe('moving between the readout and the chart, both ways', () => {
   it('right answers with the values shown move them to the chart at their pace (two by default)', () => {
     let p = step(fresh(), 'shown', true, 'sure')
     expect(p.reading!.reflection).toMatchObject({ stage: 'readout', streak: 1 })
-    p = step(p, 'shown', true, 'unsure') // right but unsure: doesn't count
-    expect(p.reading!.reflection).toMatchObject({ stage: 'readout', streak: 0 })
+    p = step(p, 'shown', true, 'unsure') // right but unsure: half
+    expect(p.reading!.reflection).toMatchObject({ stage: 'readout', streak: 1.5 })
     p = step(step(p, 'shown', true), 'shown', true)
     expect(p.reading!.reflection!.stage).toBe('chart')
     // A quick climber (their ladder pace) needs one.

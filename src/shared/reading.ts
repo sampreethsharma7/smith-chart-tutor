@@ -78,10 +78,19 @@ export function moveReading(p: Profile, skill: SkillId, values: ValuesSeen, outc
   if (values === 'typed') return { state: st }
   const toChart = (note: string): ReadingMove => ({ state: { ...st, stage: 'chart', streak: 0, misses: 0, provisional: false, source: 'answers' }, note })
   const toReadout = (note: string): ReadingMove => ({ state: { ...st, stage: 'readout', streak: 0, misses: 0, provisional: false, source: 'answers' }, note })
+  // Right but unsure (on their own, not a guess) is half the proof of a sure answer: two of them count as
+  // one. A learner who always says "not sure" but is right still moves (the Riya re-run never did).
+  const half = outcome === 'correct' && !helped && sure === 'unsure'
   if (values === 'covered') {
     if (clean) {
       if (st.stage === 'readout') return toChart('read it from the chart cleanly: values stay covered from now on')
       return { state: { ...st, streak: st.streak + 1, misses: 0, provisional: false, source: 'answers' } }
+    }
+    if (half) {
+      const streak = st.streak + 0.5
+      if (streak < 1) return { state: { ...st, streak, misses: 0 } }
+      if (st.stage === 'readout') return toChart('read it from the chart twice, unsure but right: values stay covered from now on')
+      return { state: { ...st, streak, misses: 0, provisional: false, source: 'answers' } }
     }
     if (outcome === 'incorrect' && st.stage === 'chart') {
       if (sure === 'guess') return { state: { ...st, streak: 0 } }
@@ -101,11 +110,12 @@ export function moveReading(p: Profile, skill: SkillId, values: ValuesSeen, outc
     return { state: { ...st, streak: 0, misses } }
   }
   if (st.stage === 'readout') {
-    // Right with the values on screen, on their own and sure: they know what the number is and where it lives.
-    if (!clean) return { state: { ...st, streak: 0 } }
-    const streak = st.streak + 1
+    // Right with the values on screen, on their own and sure: they know what the number is and where it lives (unsure: half).
+    if (!clean && !half) return { state: { ...st, streak: 0 } }
+    const streak = st.streak + (clean ? 1 : 0.5)
     if (streak >= climbAfter(p)) return toChart('found it on the readout reliably: values covered from the next question')
-    return { state: { ...st, streak, provisional: false, source: 'answers' } }
+    // One half isn't proof yet: the estimate stays an estimate (and follows their mastery) until a full step.
+    return { state: { ...st, streak, ...(streak >= 1 ? { provisional: false, source: 'answers' as const } : {}) } }
   }
   return { state: st } // shown by the tutor at the chart stage (a warm-up): shows nothing about reading
 }

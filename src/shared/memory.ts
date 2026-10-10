@@ -10,6 +10,7 @@ import { gatherEvidence, sessionAt, signOff, SIGNOFF_WORDS, trackOf, type SignOf
 import { ladderBrief, moveOnLadder, type Rung } from './ladder'
 import { moveReading, readingBrief, readOff, type ValuesSeen } from './reading'
 import { capstoneBrief, stageOf } from './capstone'
+import { moveOnNote, stuckNote } from './pacing'
 
 // ── Topics: the specific things a learner can be good or shaky at ───────────
 
@@ -518,6 +519,8 @@ export function learnerBrief(p: Profile, now: string): BriefParts {
   lines.push(ladderBrief(p, now))
   lines.push(readingBrief(p))
   lines.push(capstoneBrief(p))
+  // Lessons move on: away from a skill done cleanly twice, and toward a next step nothing has moved (pacing.ts).
+  for (const note of [moveOnNote(p), stuckNote(p)]) if (note) lines.push(note)
 
   const due = topics.filter(([, t]) => t.due <= now).sort((a, b) => a[1].box - b[1].box || a[1].due.localeCompare(b[1].due)).map(([id]) => id)
   const weak = topics.filter(([, t]) => topicState(t) === 'shaky').sort((a, b) => pct(a[1]) - pct(b[1])).map(([id]) => id)

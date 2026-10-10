@@ -109,9 +109,11 @@ describe('moving on the ladder: both ways, at this learner\'s pace', () => {
     expect(step(fast, item(2), 'correct', 'sure').state.rung).toBe(3)
   })
 
-  it('stays when right but unsure, helped or partly right', () => {
+  it('right but unsure counts half (two make one clean answer); helped or partly right stays', () => {
     const p = at(fresh(), 'l_match', 2, { streak: 1 })
-    expect(step(p, item(2), 'correct', 'unsure').state).toMatchObject({ rung: 2, streak: 1 }) // neither proof nor a miss
+    expect(step(p, item(2), 'correct', 'unsure').state).toMatchObject({ rung: 2, streak: 1.5 }) // half the proof of a sure answer
+    // Two unsure answers climb where one sure one would (pace 2): the re-run's always-unsure learner moves.
+    expect(step(apply(at(fresh(), 'l_match', 2, { streak: 1 }), item(2), 'correct', 'unsure'), item(2), 'correct', 'unsure').state.rung).toBe(3)
     expect(step(p, item(2), 'partial', 'sure').state).toMatchObject({ rung: 2, streak: 0 }) // help or a guess makes it partial
   })
 
